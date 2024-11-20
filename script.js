@@ -170,3 +170,32 @@ donations.forEach(item => {
     tableBody.innerHTML += row;
 });
 
+
+
+document.addEventListener("DOMContentLoaded", function () {
+    // Get all tab elements
+    const tabs = document.querySelectorAll(".tab");
+    const donationTab = document.querySelector("#donations");
+    const expenditureTab = document.querySelector("#expenditure");
+
+    // Initially show the 'Donations' div and set its tab as active
+    donationTab.style.display = "block";
+    expenditureTab.style.display = "none";
+
+    tabs.forEach(tab => {
+        tab.addEventListener("click", function () {
+            // Remove the active class from all tabs
+            tabs.forEach(t => t.classList.remove("active"));
+            // Add active class to the clicked tab
+            tab.classList.add("active");
+
+            // Hide all tab content divs
+            document.querySelectorAll("main > div").forEach(div => div.style.display = "none");
+
+            // Show the clicked tab's content
+            const target = tab.getAttribute("data-target");
+            document.getElementById(target).style.display = "block";
+        });
+    });
+});
+
