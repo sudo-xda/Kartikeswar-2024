@@ -161,6 +161,8 @@ const donations = [
     { name: "Total", amount: 90510}
 ];
 
+
+
 const tableBody = document.querySelector("#donations-table tbody");
 donations.forEach(item => {
     const row = `<tr>
@@ -170,6 +172,23 @@ donations.forEach(item => {
     tableBody.innerHTML += row;
 });
 
+const expenditures = [
+    { item: "Flowers", amount: 500, date: "2024-11-18" },
+    { item: "Decorations", amount: 2000, date: "2024-11-19" },
+    { item: "Food & Prasad", amount: 5000, date: "2024-11-20" },
+    { item: "Sound System", amount: 3000, date: "2024-11-20" },
+    { item: "Lighting", amount: 1500, date: "2024-11-19" }
+];
+
+const expenditureTableBody = document.querySelector("#expenditure-table tbody");
+expenditures.forEach(item => {
+    const row = `<tr>
+        <td>${item.item}</td>
+        <td>${item.amount}</td>
+        <td>${item.date}</td>
+    </tr>`;
+    expenditureTableBody.innerHTML += row;
+})
 
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -199,3 +218,13 @@ document.addEventListener("DOMContentLoaded", function () {
     });
 });
 
+document.addEventListener("DOMContentLoaded", function () {
+    // Hide splash screen after 3 seconds
+    setTimeout(() => {
+        const splashScreen = document.getElementById("splash-screen");
+        splashScreen.style.animation = "fadeOut 1s ease-out forwards";
+        setTimeout(() => {
+            splashScreen.style.display = "none";
+        }, 1000); // Wait for fade-out animation to finish
+    }, 3000); // 3 seconds delay
+});
