@@ -219,3 +219,22 @@ footer {
         font-size: 0.8rem;
     }
 }
+
+.breakdown {
+    margin-top: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.dropdown-toggle {
+    cursor: pointer;
+    color: blue;
+    text-decoration: underline;
+}
+
+
+#members h3 {
+    color: black;
+}

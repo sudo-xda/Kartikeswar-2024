@@ -74,92 +74,99 @@ async function fetchData(endpoint, tableId) {
 }
 
 const donations = [
-    { name: "Prabir Jena", amount: 2101 },
-    { name: "Chiku Mohanty", amount: 2101 },
-    { name: "Kuna Rout", amount: 4010 },
-    { name: "Babul Mohanty", amount: 5000 },
-    { name: "Ripu Mohanty", amount: 1500 },
-    { name: "Chintu Panda", amount: 2500 },
-    { name: "Abhilash Behura", amount: 500 },
-    { name: "Kedar Jena", amount: 2000 },
-    { name: "Bapi Rout", amount: 1000 },
-    { name: "Gudu Barik", amount: 500 },
-    { name: "Happy Sasheni", amount: 2000 },
-    { name: "Balhu Barik", amount: 1000 },
-    { name: "Bikuna Sabut", amount: 1000 },
-    { name: "Silu Rout", amount: 1000 },
-    { name: "Nitua Das", amount: 1500 },
-    { name: "Jeevan Rout", amount: 2001 },
-    { name: "Hapina Roul", amount: 1005 },
-    { name: "Sania (Mohanty)", amount: 1010 },
-    { name: "Banka Mohanty", amount: 500 },
-    { name: "Kalia Jena", amount: 500 },
-    { name: "Oka Mohanty", amount: 1000 },
-    { name: "Papu Roul", amount: 1001 },
-    { name: "Chuchu Sabut", amount: 1000 },
-    { name: "Sagar Jena", amount: 1000 },
-    { name: "Gunia Nana", amount: 2500 },
-    { name: "Kargil Rout", amount: 2000 },
-    { name: "Biswanath Jena", amount: 1000 },
-    { name: "Tushar Roy", amount: 500 },
-    { name: "Palu Rout", amount: 500 },
-    { name: "Linku Mohanty", amount: 2500 },
-    { name: "Aba Rout", amount: 1000 },
-    { name: "Dhusia Das", amount: 500 },
-    { name: "Gudu Mohanty", amount: 1000 },
-    { name: "Chintua Mohanty", amount: 1000 },
-    { name: "Nirakar Saseni", amount: 1001 },
-    { name: "Papuna Sabut", amount: 1500 },
-    { name: "Libuna Jena", amount: 700 },
-    { name: "Lantu Saseni", amount: 1500 },
-    { name: "Sagar Rout", amount: 3000 },
-    { name: "Kumar Jena", amount: 2000 },
-    { name: "Abha Mohanty", amount: 1000 },
-    { name: "Jilu Das", amount: 3000 },
-    { name: "Manguli Rout", amount: 1500 },
-    { name: "Haun Bhai", amount: 1000 },
-    { name: "Tulu Baba", amount: 1000 },
-    { name: "Jilu Mohanty", amount: 1000 },
-    { name: "Naba Das", amount: 1000 },
-    { name: "Chinu Sethi", amount: 500 },
-    { name: "Kumar Das", amount: 1000 },
-    { name: "Felu Mohanty", amount: 305 },
-    { name: "Hemanta Nayak", amount: 1000 },
-    { name: "Jiban Das", amount: 3000 },
-    { name: "Lipu Nana", amount: 350 },
-    { name: "Vobi Rout", amount: 200 },
-    { name: "Mitu Rout", amount: 500 },
-    { name: "Budha Bhaina", amount: 101 },
-    { name: "Akshay Swain", amount: 501 },
-    { name: "Papuna Mohanty Cement", amount: 1000 },
-    { name: "Papu Saseni", amount: 200 },
-    { name: "Dillip Mohanty", amount: 500 },
-    { name: "Rabina Das", amount: 200 },
-    { name: "Sima Textile", amount: 305 },
-    { name: "Bichitra Swain", amount: 510 },
-    { name: "Nanda Das", amount: 1000 },
-    { name: "Tapan Mohanty", amount: 500 },
-    { name: "Ramakanta Panda", amount: 501 },
-    { name: "Dillip Barik", amount: 205 },
-    { name: "Mangua Bhai", amount: 1000 },
-    { name: "Dolia Das", amount: 500 },
-    { name: "Lipu Rout (Bhagia)", amount: 200 },
-    { name: "Tuna Rout", amount: 501 },
-    { name: "Basanta Nayak", amount: 1001 },
-    { name: "Trilochan (Lipu)", amount: 1000 },
-    { name: "Tanu Rout", amount: 500 },
-    { name: "Amara Das", amount: 500 },
-    { name: "Kunu Jena", amount: 500 },
-    { name: "Aju Saseni", amount: 100 },
+    { name: "Abaduta Rout", amount: 1000 },
+    { name: "Abhilash Behera", amount: 500 },
+    { name: "Abhisek Mohanty", amount: 2500 },
+    { name: "Aditya Barik", amount: 500 },
+    { name: "Agasti Mohanty", amount: 500 },
+    { name: "Ajaya Roul", amount: 1005 },
+    { name: "Ajaya Saseni", amount: 100 },
+    { name: "Akshya Swain", amount: 501 },
+    { name: "Asish Ku Rout", amount: 2000 },
+    { name: "Asish Rout", amount: 500 },
+    { name: "Ayashkanta Panda", amount: 2500 },
     { name: "Badal Saseni", amount: 200 },
+    { name: "Basanta Nayak", amount: 1001 },
+    { name: "Bhubanananda Rout", amount: 200 },
+    { name: "Bibekananda Sabut", amount: 1000 },
+    { name: "Bichitra Swain", amount: 510 },
+    { name: "Biman Sabut", amount: 1000 },
+    { name: "Biswojit Das", amount: 3750 },
+    { name: "Biswonath Jena", amount: 1000 },
+    { name: "Debasish Mohanty", amount: 1000 },
+    { name: "Debiduta Mohanty", amount: 1000 },
+    { name: "Dilip Barik", amount: 205 },
+    { name: "Dilip Mohanty", amount: 500 },
+    { name: "Dinesh Mohanty", amount: 1500 },
+    { name: "Dolagobinda Das", amount: 500 },
+    { name: "Dushasana Das", amount: 500 },
+    { name: "Er Chinmaya Sethi", amount: 500 },
+    { name: "Gourisankar Mohanty", amount: 1000 },
+    { name: "Gunia Nana", amount: 2500 },
+    { name: "Hemanta Nayak", amount: 1000 },
+    { name: "Janmajya Mohanty", amount: 500 },
+    { name: "Jigyansa Jeevan Rout", amount: 2001 },
+    { name: "Jitendra Mohanty", amount: 1000 },
+    { name: "Kalia Jena", amount: 500 },
+    { name: "Kirti Ramjan Jethy", amount: 300 },
+    { name: "Krushna Das", amount: 50 },
+    { name: "KumarMani Jena", amount: 2000 },
+    { name: "Kuna Rout", amount: 4010 },
+    { name: "Kunu Jena", amount: 500 },
+    { name: "Lagnajit Jena", amount: 700 },
+    { name: "Lalatendu Saseni", amount: 1500 },
+    { name: "Lipu Saseni", amount: 350 },
+    { name: "Lipuranjan Rout", amount: 200 },
+    { name: "Mangaraj Roul", amount: 1000 },
+    { name: "Nabaghana Das", amount: 1000 },
+    { name: "Nanda Das", amount: 1000 },
+    { name: "Nirakar Saseni", amount: 1001 },
+    { name: "Nitua Das", amount: 1500 },
+    { name: "Padarbinda Mohanty", amount: 500 },
+    { name: "Papu Sabuta", amount: 2200 },
+    { name: "Papu Saseni", amount: 200 },
+    { name: "Papuna Mohanty", amount: 1000 },
+    { name: "Patyabrata Das", amount: 3000 },
+    { name: "Pintu Panda", amount: 501 },
+    { name: "Pintuna Das", amount: 2370 },
+    { name: "Prabash Sabut", amount: 1500 },
+    { name: "Prabir Ku Jena", amount: 2101 },
+    { name: "Prasanjit Mohanty", amount: 5000 },
+    { name: "Prasant Rout", amount: 1000 },
+    { name: "Pratap Behera", amount: 1000 },
+    { name: "Priyabrata Mohanty", amount: 305 },
+    { name: "Rabina Das", amount: 200 },
+    { name: "Rabindra Saseni", amount: 500 },
+    { name: "Rajesh Barik", amount: 1000 },
+    { name: "Rajib Ku Das", amount: 500 },
+    { name: "Sachikanta Mohanty", amount: 1000 },
     { name: "Sagar Behera", amount: 1000 },
-    { name: "Lipu Mohanty (Kalaghara)", amount: 500 },
-    { name: "Butu Panda", amount: 500 },
-    { name: "Papu Roul", amount: 1000 },
-    { name: "Siba Panda", amount: 200 },
-    { name: "Rabi Saseni", amount: 500 },
-    { name: "Total", amount: 90510}
+    { name: "Sagar Jena", amount: 1000 },
+    { name: "Sagar Mohanty", amount: 2101 },
+    { name: "Sagar Rout", amount: 3000 },
+    { name: "Sanjaya Roul", amount: 2000 },
+    { name: "Sanjeeb Das", amount: 1000 },
+    { name: "Santosh Roul", amount: 500 },
+    { name: "Sarbjit Mohanty", amount: 1010 },
+    { name: "Sima Textiles", amount: 305 },
+    { name: "Somya Ranjan Jena", amount: 2000 },
+    { name: "Subrajit Saseni", amount: 2000 },
+    { name: "Sumanta Mohanty", amount: 3200 },
+    { name: "Sumanta Rout", amount: 500 },
+    { name: "Suryakanta Rout", amount: 1000 },
+    { name: "Suryakanta Sethi", amount: 1000 },
+    { name: "Tanmaya Rout", amount: 500 },
+    { name: "Tapan Mohanty", amount: 500 },
+    { name: "Trilochan Rout", amount: 1000 },
+    { name: "Tulu Sethi", amount: 1000 },
+    { name: "Tuna Rout", amount: 501 },
+    { name: "Tushar Panda", amount: 500 },
+    { name: "Tushar Rnj Mohanty", amount: 630 },
+    { name: "Tushar Rout", amount: 1500 },
+    { name: "Tushar Roy", amount: 500 },
+   
 ];
+
 
 
 
@@ -172,23 +179,9 @@ donations.forEach(item => {
     tableBody.innerHTML += row;
 });
 
-const expenditures = [
-    { item: "Flowers", amount: 500, date: "2024-11-18" },
-    { item: "Decorations", amount: 2000, date: "2024-11-19" },
-    { item: "Food & Prasad", amount: 5000, date: "2024-11-20" },
-    { item: "Sound System", amount: 3000, date: "2024-11-20" },
-    { item: "Lighting", amount: 1500, date: "2024-11-19" }
-];
 
-const expenditureTableBody = document.querySelector("#expenditure-table tbody");
-expenditures.forEach(item => {
-    const row = `<tr>
-        <td>${item.item}</td>
-        <td>${item.amount}</td>
-        <td>${item.date}</td>
-    </tr>`;
-    expenditureTableBody.innerHTML += row;
-})
+
+
 
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -228,3 +221,13 @@ document.addEventListener("DOMContentLoaded", function () {
         }, 1000); // Wait for fade-out animation to finish
     }, 3000); // 3 seconds delay
 });
+
+
+function toggleBreakdown(element) {
+    const breakdown = element.nextElementSibling;
+    if (breakdown.style.display === "none") {
+        breakdown.style.display = "block";
+    } else {
+        breakdown.style.display = "none";
+    }
+}
