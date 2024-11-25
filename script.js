@@ -126,7 +126,7 @@ const donations = [
     { name: "Papu Sabuta", amount: 2200 },
     { name: "Papu Saseni", amount: 200 },
     { name: "Papuna Mohanty", amount: 1000 },
-    { name: "Patyabrata Das", amount: 3000 },
+    { name: "Priyabrata Das", amount: 3000 },
     { name: "Pintu Panda", amount: 501 },
     { name: "Pintuna Das", amount: 2370 },
     { name: "Prabash Sabut", amount: 1500 },
