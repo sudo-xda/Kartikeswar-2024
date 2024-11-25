@@ -238,3 +238,10 @@ footer {
 #members h3 {
     color: black;
 }
+
+.small-header {
+    font-size: 16px; /* Adjust size as needed */
+    margin: 0; /* Remove extra margin */
+    font-weight: normal; /* Optional: Make it less bold */
+    color: #555; /* Optional: Subtle color */
+}
