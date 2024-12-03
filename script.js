@@ -108,6 +108,7 @@ const donations = [
     { name: "Jigyansa Jeevan Rout", amount: 2001 },
     { name: "Jitendra Mohanty", amount: 1000 },
     { name: "Kalia Jena", amount: 500 },
+    {name: "Kalia Rout", amount: 1000 },
     { name: "Kirti Ramjan Jethy", amount: 300 },
     { name: "Krushna Das", amount: 50 },
     { name: "KumarMani Jena", amount: 2000 },
