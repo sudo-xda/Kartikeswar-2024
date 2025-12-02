@@ -138,7 +138,7 @@ const pujaData = {
         "amount": 5511
       },
       {
-        "name": "Lagnajit Jena",
+        "name": "Shubhashish Jena (Libun Sir)",
         "amount": 1000
       },
       {
