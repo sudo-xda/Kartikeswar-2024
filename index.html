@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,21 +10,29 @@
     <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 
 </head>
+
 <body>
     <header>
         <h2 class="small-header">Jay Maa Siddha Mangala</h2>
         <h1>Welcome to Kartikeswar Puja Committee Portal</h1>
+        <div class="year-selector">
+            <label for="year-select">Select Year: </label>
+            <select id="year-select">
+                <option value="2025" selected>2025</option>
+                <option value="2024">2024</option>
+            </select>
+        </div>
     </header>
-    
+
     <div id="splash-screen">
         <div class="splash-content">
             <h1>Omm Shri Kartikeya Namah</h1>
             <h2>Welcome to</h1>
-            <h2>Kartikeswar Management Portal</h2>
-            <p>Managing with ease and efficiency</p>
+                <h2>Kartikeswar Management Portal</h2>
+                <p>Managing with ease and efficiency</p>
         </div>
     </div>
-    
+
     <!-- Tabs and Main Content -->
     <div class="tabs">
         <button class="tab active" data-target="donations">Donations</button>
@@ -50,9 +59,8 @@
                 </tfoot>
             </table>
         </div>
-        
 
-        <div id="expenditure" class="content active">
+        <div id="expenditure" class="content">
             <table id="expenditure-table">
                 <thead>
                     <tr>
@@ -61,227 +69,10 @@
                     </tr>
                 </thead>
                 <tbody>
-                    <!-- Murti -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Murti</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Murti: 10,000.00</li>
-                                    <li>ii) Transport: 500.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>10,500.00</td>
-                    </tr>
-        
-                    <!-- Tent -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Tent</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>Tent: 10,000.00</li>
-                                    <li>Tiffin: 400.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>10,400.00</td>
-                    </tr>
-        
-                    <!-- Puja Samagri -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Puja Samagri</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Puja Samagri: 4,500.00</li>
-                                    <li>ii) Luga Pata: 2,630.00</li>
-                                    <li>iii) Mati Jinisha: 300.00</li>
-                                    <li>iv) Cow Ghee 3ltrs: 2,700.00</li>
-                                    <li>v) Ghee: 980.00</li>
-                                    <li>vi) Haladi: 15.00</li>
-                                    <li>vii) Suta: 15.00</li>
-                                    <li>viii) Darpan: 15.00</li>
-                                    <li>ix) Amba Katha: 650.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>11,805.00</td>
-                    </tr>
-        
-                    <!-- Nana -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Nana</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>Biswojit Bhaina: 6,500.00</li>
-                                    <li>Bibhu Nana: 500.00</li>
-                                    <li>Bramhan Sahi: 700.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>7,700.00</td>
-                    </tr>
-        
-                    <!-- Kalash Buda Program -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Kalash Buda Program</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Paeida: 110.00</li>
-                                    <li>ii) Patu Mohanty: 50.00</li>
-                                    <li>iii) Cold drinks & Glass: 120.00</li>
-                                    <li>iv) Pana: 20.00</li>
-                                    <li>v) Bidi: 25.00</li>
-                                    <li>vi) Bana: 350.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>675.00</td>
-                    </tr>
-        
-                    <!-- Vhoga -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Vhoga</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Apple: 280.00</li>
-                                    <li>ii) Orange: 80.00</li>
-                                    <li>iii) Grapes (2 Times): 250.00</li>
-                                    <li>iv) Kora Khaei: 70.00</li>
-                                    <li>v) Rasi Ladu: 200.00</li>
-                                    <li>vi) Bag: 20.00</li>
-                                    <li>vii) Banana: 50.00</li>
-                                    <li>viii) Besan: 1,751.00</li>
-                                    <li>ix) Chini: 660.00</li>
-                                    <li>x) Oil: 1,935.00</li>
-                                    <li>xi) Colour: 20.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>5,316.00</td>
-                    </tr>
-        
-                    <!-- Charubana -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Charubana</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Arua Chaula: 150.00</li>
-                                    <li>ii) Chini: 90.00</li>
-                                    <li>iii) Gujurati: 75.00</li>
-                                    <li>iv) Labanga: 75.00</li>
-                                    <li>v) Aleicha: 50.00</li>
-                                    <li>vi) Jaeiti: 30.00</li>
-                                    <li>vii) Jai Fhala: 14.00</li>
-                                    <li>viii) Cheri: 70.00</li>
-                                    <li>ix) Misri: 80.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>634.00</td>
-                    </tr>
-        
-                    <!-- Flower -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Flower</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) 1st Day Mala: 300.00</li>
-                                    <li>ii) Mala: 600.00</li>
-                                    <li>iii) 2nd Day Mala: 350.00</li>
-                                    <li>iv) Decoration: 3,500.00</li>
-                                    <li>v) Gendu: 150.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>4,900.00</td>
-                    </tr>
-        
-                    <!-- Vhasani -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Vhasani</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) DJ: 14,800.00</li>
-                                    <li>ii) Diesel (25x98): 2,450.00</li>
-                                    <li>iii) Thuniki Baja: 3,800.00</li>
-                                    <li>iv) Rainbow: 510.00</li>
-                                    <li>v) Hit: 210.00</li>
-                                    <li>vi) Bana: 3,600.00</li>
-                                    <li>vii) Krushna (Tractor): 180.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>25,550.00</td>
-                    </tr>
-                    <!-- Feast -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Feast</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Chicken: 7,700.00</li>
-                                    <li>ii) Grocery: 2,867.00</li>
-                                    <li>iii) Gania Nana: 800.00</li>
-                                    <li>iv) Tomato: 40.00</li>
-                                    <li>v) Salt: 30.00</li>
-                                    <li>vi) Patra: 420.00</li>
-                                    <li>vii) Veg Mill (10x100): 1,000.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>12,857.00</td>
-                    </tr>
-
-                    <!-- Other Expenses -->
-                    <tr>
-                        <td>
-                            <span class="dropdown-toggle" onclick="toggleBreakdown(this)">Other Expenses</span>
-                            <div class="breakdown" style="display: none;">
-                                <ul>
-                                    <li>i) Guna Malik: 600.00</li>
-                                    <li>ii) Karta Dakhina: 200.00</li>
-                                    <li>iii) Surf Excel: 10.00</li>
-                                    <li>iv) Gudia: 800.00</li>
-                                    <li>v) Gudia Tiffin: 50.00</li>
-                                    <li>vi) Gudia Cold Drinks: 40.00</li>
-                                    <li>vii) Gas: 850.00</li>
-                                    <li>viii) Nadia (25x12) & Arua Chaula: 730.00</li>
-                                    <li>ix) Pana (Biswojit Bhaina): 20.00</li>
-                                    <li>xi) Chena: 150.00</li>
-                                    <li>xii) Gamucha: 1,305.00</li>
-                                    <li>xiii) Siba Nana Dokan: 700.00</li>
-                                    <li>xiv) Rabina Dokan: 600.00</li>
-                                    <li>xv) Pana Vhoga: 300.00</li>
-                                </ul>
-                            </div>
-                        </td>
-                        <td>6,355.00</td>
-                    </tr>
-                    <!-- Total -->
-                    <tr>
-                        <td><strong>TOTAL</strong></td>
-                        <td><strong>96,692.00</strong></td>
-                    </tr>
-
-
-
-
+                    <!-- Data rows will be dynamically added here -->
                 </tbody>
             </table>
         </div>
-        
-
-
-        
 
         <div id="members" class="content">
             <table id="balance-table">
@@ -294,15 +85,15 @@
                 <tbody>
                     <tr>
                         <td>Total Collection</td>
-                        <td>102,708.00</td>
+                        <td>0.00</td>
                     </tr>
                     <tr>
                         <td>Total Expenditure</td>
-                        <td>96,692.00</td>
+                        <td>0.00</td>
                     </tr>
                     <tr>
                         <td><strong>Total Balance</strong></td>
-                        <td><strong>+6,016.00</strong></td>
+                        <td><strong>0.00</strong></td>
                     </tr>
                 </tbody>
             </table>
@@ -330,20 +121,17 @@
                 </tbody>
             </table>
         </div>
-
-        
-
-        
-        
     </main>
 
     <footer>
         <p>&copy; 2024 Kartikeswar Puja Committee, Karanga</p>
     </footer>
 
+    <script src="data.js"></script>
     <script src="script.js"></script>
     <!-- 100% privacy-first analytics -->
     <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
 
 </body>
+
 </html>
