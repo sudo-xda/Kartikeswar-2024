@@ -67,7 +67,7 @@ table {
 
 table th, table td {
     padding: 12px;
-    text-align: center;
+    text-align: left;
     border: 1px solid #ddd;
 }
 
