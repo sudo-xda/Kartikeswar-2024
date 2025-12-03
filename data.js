@@ -135,12 +135,9 @@ const pujaData = {
       },
       {
         "name": "Kuna Rout",
-        "amount": 5511
+        "amount": 4011
       },
-      {
-        "name": "Shubhashish Jena (Libun Sir)",
-        "amount": 1000
-      },
+
       {
         "name": "Lalatendu Saseni",
         "amount": 3000
@@ -266,6 +263,10 @@ const pujaData = {
         "amount": 2001
       },
       {
+        "name": "Shubhashish Jena (Libun Sir)",
+        "amount": 1000
+      },
+      {
         "name": "Sima Textiles",
         "amount": 510
       },
@@ -288,6 +289,10 @@ const pujaData = {
       {
         "name": "Suryakanta Rout",
         "amount": 1010
+      },
+            {
+        "name": "Suryakanta Sethi(GUGU)",
+        "amount": 1500
       },
       {
         "name": "Tanmaya Rout",
