@@ -222,6 +222,7 @@ const state = {
     pendingQr: undefined, // QR image chosen in Settings but not saved yet ("" = remove)
     pendingPhoto: undefined, // photo picked in the open collection/expense form ("" = remove)
     photoEntry: null, // the entry that form is editing
+    queue: null, // running reminder queue: { ids, index, sent, skipped, sentCurrent }
     search: {},
     fuFilter: "todo",
     entriesTab: "collections"
@@ -671,13 +672,15 @@ function viewHome() {
             <div class="bar"><span style="width:${progress}%"></span></div>
         </div>` : ""}
 
+        ${activeNowPanel()}
+
         ${groups.calls.length ? `
         <div class="panel">
             <div class="row-between"><h2>${t("todaysCalls")} · ${groups.calls.length}</h2><a href="#followup" data-act="fu-filter-go" data-filter="calls">${t("seeAll")}</a></div>
             ${groups.calls.slice(0, 5).map(d => `
                 <div class="row-between">
                     <span><b>${esc(d.name)}</b>${followup(d).note ? `<span class="muted small block-line">${esc(followup(d).note)}</span>` : ""}</span>
-                    ${d.phone ? `<a class="btn small" href="${telLink(d.phone)}" data-act="contacted" data-id="${d.id}">${t("call")}</a>` : ""}
+                    ${d.phone ? `<a class="btn small" href="${telLink(d.phone)}" data-act="contacted" data-lead="call" data-id="${d.id}">${t("call")}</a>` : ""}
                 </div>`).join("")}
         </div>` : ""}
 
@@ -746,6 +749,20 @@ function collectionRow(c) {
     return entryRow(c.donorName, parts.join(" · "), c.amount, c, "collection", c.deleted ? "cancelled" : "");
 }
 
+function activeNowPanel() {
+    const live = state.donors.filter(d => isLive(followup(d).leadAt))
+        .sort((a, b) => millis(followup(b).leadAt) - millis(followup(a).leadAt));
+    if (!live.length) return "";
+    return `
+        <div class="panel">
+            <h2><span class="live-dot"></span>${t("activeNow")}</h2>
+            ${live.slice(0, 5).map(d => `
+                <div class="row-between small">
+                    <span><b>${esc(d.name)}</b><span class="muted block-line">${leadText(d)}</span></span>
+                </div>`).join("")}
+        </div>`;
+}
+
 // --- Today's summary for the committee WhatsApp group ---
 
 function summaryText() {
@@ -803,6 +820,7 @@ function viewFollowup() {
             <h1>${t("navFollowup")}</h1>
             <p class="muted">${t("donorsPaidOf", { paid: paid.size, total: state.donors.length })}</p>
         </div>
+        ${state.donors.length ? `<button class="btn wa block queue-btn" data-act="queue-setup">${icon("whatsapp")} ${t("startReminders")}</button>` : ""}
         ${searchBox("followup", t("searchName"))}
         <div class="chips">
             ${FU_FILTERS.filter(([key]) => key !== "calls" || groups.calls.length).map(([key, label]) => `
@@ -813,13 +831,16 @@ function viewFollowup() {
         <div id="list">${followupList()}</div>`;
 }
 
+// Biggest past donors first
+const byLastGift = donors => donors.slice().sort((a, b) =>
+    ((lastGift(b) || {}).amount || 0) - ((lastGift(a) || {}).amount || 0) || a.name.localeCompare(b.name));
+
 function followupList() {
     const { groups, paid } = followupGroups();
     const term = searchTerm("followup");
     let donors = groups[state.fuFilter] || [];
     if (term) donors = donors.filter(d => nameKey(d.name).includes(term));
-    donors = donors.slice().sort((a, b) =>
-        ((lastGift(b) || {}).amount || 0) - ((lastGift(a) || {}).amount || 0) || a.name.localeCompare(b.name));
+    donors = byLastGift(donors);
 
     if (!state.donors.length) return `<div class="empty">${t("noDonors")}</div>`;
     if (!donors.length) return `<div class="empty">${t("nobodyHere")}</div>`;
@@ -856,8 +877,8 @@ function donorCard(donor, paidAmount) {
             : "";
     } else if (donor.phone) {
         actions = `
-            <a class="btn wa" href="${esc(waLink(donor.phone, reminderMessage(donor)))}" target="_blank" rel="noopener" data-act="contacted" data-id="${donor.id}">${icon("whatsapp")} ${t("remind")}</a>
-            <a class="btn" href="${telLink(donor.phone)}" data-act="contacted" data-id="${donor.id}">${t("call")}</a>
+            <a class="btn wa" href="${esc(waLink(donor.phone, reminderMessage(donor)))}" target="_blank" rel="noopener" data-act="contacted" data-lead="remind" data-id="${donor.id}">${icon("whatsapp")} ${t("remind")}</a>
+            <a class="btn" href="${telLink(donor.phone)}" data-act="contacted" data-lead="call" data-id="${donor.id}">${t("call")}</a>
             ${upiBtn}
             <button class="btn" data-act="fu-update" data-id="${donor.id}">${t("update")}</button>
             <button class="btn primary" data-act="collect" data-id="${donor.id}">${t("paidBtn")}</button>`;
@@ -879,8 +900,121 @@ function donorCard(donor, paidAmount) {
                 ${statusBadge(donor, paidAmount)}
             </div>
             ${fu.note ? `<p class="dc-note">${esc(fu.note)}</p>` : ""}
+            ${paidAmount ? "" : leadLine(donor)}
             ${actions ? `<div class="dc-actions">${actions}</div>` : ""}
         </article>`;
+}
+
+// --- Who is on a donor: the last member who reminded / called / showed UPI / updated ---
+// Everyone sees it; it never stops anyone else from contacting the donor.
+
+const LEAD_TEXT = { remind: "leadRemind", call: "leadCall", upi: "leadUpi", update: "leadUpdate" };
+const millis = ts => (ts && ts.toMillis ? ts.toMillis() : 0);
+const isToday = ts => millis(ts) && new Date(millis(ts)).toDateString() === new Date().toDateString();
+const isLive = ts => millis(ts) && Date.now() - millis(ts) < 60 * 60 * 1000;
+
+function fmtWhen(ts) {
+    const ms = millis(ts);
+    if (!ms) return "";
+    const date = new Date(ms);
+    return isToday(ts)
+        ? date.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" })
+        : date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+}
+
+function leadText(donor) {
+    const fu = followup(donor);
+    if (!fu.leadBy) return "";
+    const who = fu.leadBy === state.me.id ? t("you") : esc(memberName(fu.leadBy));
+    return `${t(LEAD_TEXT[fu.leadAction] || "leadUpdate", { name: who })} · ${fmtWhen(fu.leadAt)}`;
+}
+
+function leadLine(donor) {
+    const fu = followup(donor);
+    if (!fu.leadBy) return "";
+    return `<p class="lead ${isLive(fu.leadAt) ? "live" : ""}"><span class="dot"></span>${leadText(donor)}</p>`;
+}
+
+function markLead(donorId, action) {
+    const fu = followup(donorById(donorId) || {});
+    const update = { leadBy: state.me.id, leadAction: action, leadAt: serverTimestamp() };
+    if (action === "remind" || action === "call") Object.assign(update, { contactedAt: today(), contactedBy: state.me.id });
+    if (!fu.assignedTo) update.assignedTo = state.me.id;
+    commit(setDoc(doc(db, "donors", donorId), { fu: { [year()]: update } }, { merge: true }));
+}
+
+// --- Reminder queue: one donor after another, each sent by hand from your own WhatsApp ---
+
+const QUEUE_LISTS = [["todo", "fTodo"], ["mine", "fMine"], ["fresh", "fFresh"], ["promised", "fPromised"]];
+
+function queueDonors(list, skipToday) {
+    const { groups } = followupGroups();
+    let donors = (groups[list] || []).filter(d => d.phone);
+    if (skipToday) donors = donors.filter(d => followup(d).contactedAt !== today());
+    return byLastGift(donors);
+}
+
+function openQueueSetup(list = "todo", skipToday = true) {
+    const option = ([key, label]) => `
+        <label><input type="radio" name="list" value="${key}" ${key === list ? "checked" : ""}>
+            ${t(label)} <span class="muted small">${queueDonors(key, skipToday).length}</span></label>`;
+    openSheet(t("queueTitle"), `
+        <form class="form" data-form="queue-start">
+            <span class="field-label">${t("queueWho")}</span>
+            <div class="radio-col">${QUEUE_LISTS.map(option).join("")}</div>
+            <label class="check-row"><input type="checkbox" name="skipToday" ${skipToday ? "checked" : ""}> ${t("queueSkipToday")}</label>
+            <p class="hint">${t("queueOnlyPhones")}</p>
+            <button class="btn wa block">${icon("whatsapp")} ${t("queueStart")}</button>
+        </form>`);
+}
+
+function renderQueue() {
+    const q = state.queue;
+    if (!q) return;
+    if (q.index >= q.ids.length) {
+        const summary = t("queueDone", { sent: q.sent, skipped: q.skipped });
+        state.queue = null;
+        openSheet(t("queueTitle"), `
+            <div class="done">
+                <div class="tick">✓</div>
+                <p>${summary}</p>
+                <button class="btn block" data-act="close-sheet">${t("done")}</button>
+            </div>`);
+        return;
+    }
+    const donor = donorById(q.ids[q.index]);
+    if (!donor) {
+        q.index++;
+        return renderQueue();
+    }
+    const fu = followup(donor);
+    const last = lastGift(donor);
+    const someoneElse = fu.leadBy && fu.leadBy !== state.me.id && isToday(fu.leadAt);
+    openSheet(t("queueProgress", { n: q.index + 1, total: q.ids.length }), `
+        <div class="queue">
+            <div class="bar"><span style="width:${(q.index / q.ids.length) * 100}%"></span></div>
+            <h3>${esc(donor.name)}</h3>
+            <p class="muted">${last ? `${last.year}: ${rs(last.amount)}` : t("newDonor")} · ${esc(donor.phone)}</p>
+            ${fu.note ? `<p class="dc-note">${esc(fu.note)}</p>` : ""}
+            ${someoneElse ? `<p class="lead-warn">${t("queueOtherLead", { line: leadText(donor) })}</p>` : leadLine(donor)}
+            ${q.sentCurrent ? `
+                <p class="sent-ok">✓ ${t("queueSent")}</p>
+                <button class="btn primary block" data-act="queue-next">${t("queueNext")}</button>` : `
+                <a class="btn wa block big" href="${esc(waLink(donor.phone, reminderMessage(donor)))}" target="_blank" rel="noopener"
+                    data-act="queue-send" data-id="${donor.id}">${icon("whatsapp")} ${t("queueSend")}</a>
+                <div class="btn-row">
+                    <button class="btn" data-act="queue-skip">${t("queueSkip")}</button>
+                    <button class="btn" data-act="queue-stop">${t("queueStop")}</button>
+                </div>`}
+            <p class="hint">${t("queueHint")}</p>
+        </div>`);
+}
+
+function queueAdvance() {
+    if (!state.queue) return;
+    state.queue.index++;
+    state.queue.sentCurrent = false;
+    renderQueue();
 }
 
 const msgKey = base => state.settings.msgLang === "en" ? base : base + "Or";
@@ -1378,6 +1512,7 @@ function closeSheet(fromBackButton) {
     if (!sheetOpen) return;
     sheetOpen = false;
     resetPhoto();
+    state.queue = null;
     pushAfterBack = false;
     $("#sheet-root").innerHTML = "";
     document.body.classList.remove("no-scroll");
@@ -1750,7 +1885,10 @@ const FORMS = {
             callOn: f.callOn || "",
             assignedTo: f.assignedTo,
             note: f.note.trim(),
-            updatedBy: state.me.id
+            updatedBy: state.me.id,
+            leadBy: state.me.id,
+            leadAction: "update",
+            leadAt: serverTimestamp()
         };
         commit(setDoc(doc(db, "donors", form.dataset.id), { fu: { [year()]: update } }, { merge: true }));
         closeSheet();
@@ -1812,6 +1950,15 @@ const FORMS = {
         commit(setDoc(ref, data, { merge: true }));
         closeSheet();
         toast(t("saved"));
+    },
+
+    "queue-start"(form) {
+        const list = formValues(form).list || "todo";
+        const skipToday = form.elements.skipToday.checked;
+        const ids = queueDonors(list, skipToday).map(d => d.id);
+        if (!ids.length) return toast(t("queueEmpty"));
+        state.queue = { ids, index: 0, sent: 0, skipped: 0, sentCurrent: false };
+        renderQueue();
     },
 
     "upi-amount"(form) {
@@ -1885,7 +2032,10 @@ const ACTIONS = {
     "new-vendor": () => openVendorSheet(),
     "collect": (el, id) => openCollectionSheet({ donorId: id }),
     "fu-update": (el, id) => openFollowupSheet(id),
-    "upi-qr": (el, id) => openUpiSheet(id),
+    "upi-qr": (el, id) => {
+        markLead(id, "upi");
+        openUpiSheet(id);
+    },
     "edit-donor": (el, id) => openDonorSheet(id),
     "paste-numbers": () => openPasteNumbersSheet(),
     "edit-collection": (el, id) => openCollectionSheet({ entry: state.collectionsAll.find(c => c.id === id) }),
@@ -1906,12 +2056,26 @@ const ACTIONS = {
         });
     },
 
-    "contacted": (el, id) => {
-        const fu = followup(donorById(id) || {});
-        const update = { contactedAt: today(), contactedBy: state.me.id };
-        if (!fu.assignedTo) update.assignedTo = state.me.id;
-        commit(setDoc(doc(db, "donors", id), { fu: { [year()]: update } }, { merge: true }));
+    "contacted": (el, id) => markLead(id, el.dataset.lead || "remind"),
+
+    "queue-setup": () => openQueueSetup(),
+
+    "queue-send": (el, id) => {
+        markLead(id, "remind");
+        state.queue.sent++;
+        state.queue.sentCurrent = true;
+        // Let WhatsApp open first; the sheet then shows "Sent" with a Next button
+        setTimeout(renderQueue, 400);
     },
+
+    "queue-next": queueAdvance,
+
+    "queue-skip": () => {
+        state.queue.skipped++;
+        queueAdvance();
+    },
+
+    "queue-stop": () => closeSheet(),
 
     "task-toggle": (el, id) => {
         const task = state.tasks.find(x => x.id === id);
@@ -2171,6 +2335,10 @@ document.addEventListener("change", e => {
         const vendor = vendorById(e.target.value);
         if (vendor) form.elements.category.value = vendor.category || "";
     }
+    if (form && form.dataset.form === "queue-start") {
+        openQueueSetup(formValues(form).list, form.elements.skipToday.checked);
+        return;
+    }
     // Changing the amount on the UPI sheet redraws the QR code
     if (e.target.form && e.target.form.dataset.form === "upi-amount") {
         openUpiSheet(form.dataset.id, e.target.value);
@@ -2202,6 +2370,12 @@ window.addEventListener("online", () => {
     scheduleRender();
 });
 window.addEventListener("offline", scheduleRender);
+
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible" && state.queue && state.queue.sentCurrent) {
+        setTimeout(queueAdvance, 300);
+    }
+});
 
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => { });

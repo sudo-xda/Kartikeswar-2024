@@ -90,6 +90,10 @@ Without step 5 the app shows a thin address bar at the top; everything still wor
   also be paid from / moved to the bank account (e.g. depositing collected cash).
 - **Photos:** collections can have a payment screenshot and expenses a bill photo (Take photo or Gallery). Each photo is
   shrunk to ~100–200 KB and kept in Firestore (Firebase file storage needs a paid plan); a few thousand photos fit in the free 1 GB.
+- **Reminder queue:** Follow-up → **Start reminders** goes through donors one by one (biggest past donors first). Each
+  reminder is sent by hand from your own WhatsApp, so there is no risk of the number being banned.
+- **Who is on a donor:** every reminder, call, UPI QR or update shows on the donor card for all members
+  (green dot = in the last hour, also listed under **Active now** on Home). It never stops another member from sending.
 - **Language:** each phone chooses English or ଓଡ଼ିଆ (More, or the login screen). Have someone check the Odia wording;
   the WhatsApp messages can be edited in Settings.
 - **Cash in hand:** each collection adds to the person who received it, each expense subtracts from who paid, and

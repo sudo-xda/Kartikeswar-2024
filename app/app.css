@@ -746,7 +746,7 @@ h3 {
     color: var(--muted);
 }
 
-.form input:not([type="radio"]),
+.form input:not([type="radio"]):not([type="checkbox"]),
 .form select,
 .form textarea,
 .id-login input {
@@ -1308,4 +1308,103 @@ textarea:focus {
     position: absolute;
     top: 16px;
     right: 16px;
+}
+
+/* Reminder queue & who is on a donor */
+.queue-btn {
+    margin-bottom: 12px;
+}
+
+.lead {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 8px 0 0;
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.lead .dot,
+.live-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--line);
+    flex: 0 0 auto;
+}
+
+.lead.live {
+    color: var(--green);
+    font-weight: 600;
+}
+
+.lead.live .dot,
+.live-dot {
+    background: var(--green);
+    box-shadow: 0 0 0 3px var(--green-soft);
+    animation: pulse 1.6s ease-in-out infinite;
+}
+
+.live-dot {
+    display: inline-block;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes pulse {
+    50% { box-shadow: 0 0 0 6px transparent; }
+}
+
+.lead-warn {
+    margin: 0;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--gold-soft);
+    color: #8a5a00;
+    font-size: 0.9rem;
+}
+
+.queue {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+}
+
+.queue h3 {
+    font-size: 1.4rem;
+    color: var(--maroon);
+}
+
+.queue p {
+    margin: 0;
+}
+
+.queue .lead {
+    justify-content: center;
+}
+
+.btn.big {
+    min-height: 54px;
+    font-size: 1.05rem;
+}
+
+.sent-ok {
+    font-weight: 700;
+    color: var(--green);
+}
+
+.form .check-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--ink);
+}
+
+.check-row input {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--maroon);
 }
