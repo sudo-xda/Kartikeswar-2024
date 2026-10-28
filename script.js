@@ -1,7 +1,3 @@
-// Tab Switching
-const tabs = document.querySelectorAll('.tab');
-const contents = document.querySelectorAll('.content');
-
 // Disable PrintScreen functionality
 document.addEventListener("keyup", function (event) {
     if (event.key === "PrintScreen") {
@@ -33,28 +29,10 @@ document.addEventListener("keydown", function (e) {
     }
 });
 
-// Add a dynamic watermark with a timestamp
-const watermark = document.querySelector('.watermark');
-if (watermark) {
-    setInterval(() => {
-        const date = new Date();
-        watermark.textContent = `DONATION LIST - ${date.toLocaleString()}`;
-    }, 1000);
-}
-
-tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-        tabs.forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        contents.forEach(content => content.classList.remove('active'));
-        document.getElementById(tab.getAttribute('data-target')).classList.add('active');
-    });
-});
-
 // --- Dynamic Data Logic ---
 
-let currentYear = "2025";
+const years = Object.keys(pujaData).sort().reverse();
+let currentYear = years[0];
 
 // Holders Data
 const holdersData = {
@@ -70,6 +48,16 @@ const holdersData = {
     ]
 };
 
+function formatRs(amount) {
+    return "₹" + amount.toLocaleString("en-IN");
+}
+
+function escapeHtml(text) {
+    const div = document.createElement("div");
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 function calculateTotal(year) {
     const data = pujaData[year];
     if (!data) return { donations: 0, expenditure: 0 };
@@ -80,181 +68,263 @@ function calculateTotal(year) {
     return { donations: totalDonations, expenditure: totalExpenditure };
 }
 
-function renderData(year) {
+// Balance left over from the previous year's puja (0 for the first year)
+function carryForward(year) {
+    const previousYear = String(Number(year) - 1);
+    if (!pujaData[previousYear]) return 0;
+    return closingBalance(previousYear);
+}
+
+function closingBalance(year) {
+    const totals = calculateTotal(year);
+    return carryForward(year) + totals.donations - totals.expenditure;
+}
+
+function changeNote(current, previous, previousYear) {
+    if (!previous) return "";
+    const diff = current - previous;
+    const sign = diff >= 0 ? "+" : "−";
+    return `${sign}${formatRs(Math.abs(diff))} vs ${previousYear}`;
+}
+
+// --- Summary cards ---
+
+function renderStats(year) {
     const data = pujaData[year];
-    if (!data) return;
+    const totals = calculateTotal(year);
+    const previousYear = String(Number(year) - 1);
+    const previous = pujaData[previousYear] ? calculateTotal(previousYear) : null;
+    const balance = closingBalance(year);
+    const cf = carryForward(year);
 
-    // Render Donations
-    const donationsTableBody = document.querySelector("#donations-table tbody");
-    donationsTableBody.innerHTML = "";
-    let totalDonations = 0;
+    document.getElementById("stat-collection").textContent = formatRs(totals.donations);
+    document.getElementById("stat-collection-note").textContent =
+        previous ? changeNote(totals.donations, previous.donations, previousYear) : `Puja ${year}`;
 
-    data.donations.forEach(item => {
-        const row = `<tr>
-            <td>${item.name}</td>
-            <td>${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        </tr>`;
-        donationsTableBody.innerHTML += row;
-        totalDonations += item.amount;
-    });
+    document.getElementById("stat-expenditure").textContent = formatRs(totals.expenditure);
+    document.getElementById("stat-expenditure-note").textContent =
+        previous ? changeNote(totals.expenditure, previous.expenditure, previousYear) : `Puja ${year}`;
 
-    // Update Donation Total
-    const donationFooter = document.querySelector("#donations-table tfoot td:last-child strong");
-    if (donationFooter) {
-        donationFooter.textContent = totalDonations.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
+    const balanceEl = document.getElementById("stat-balance");
+    balanceEl.textContent = (balance < 0 ? "−" : "") + formatRs(Math.abs(balance));
+    balanceEl.classList.toggle("negative", balance < 0);
+    document.getElementById("stat-balance-note").textContent =
+        cf ? `Incl. ${formatRs(cf)} from ${previousYear}` : "Carried to next year";
 
-    // Render Expenditure
-    const expenditureTableBody = document.querySelector("#expenditure-table tbody");
-
-    // Clear all rows first
-    expenditureTableBody.innerHTML = "";
-    let expenditureTotal = 0;
-
-    data.expenditure.forEach(category => {
-        let itemsHtml = "";
-        if (category.items && category.items.length > 0) {
-            itemsHtml = `<div class="breakdown" style="display: none;"><ul>`;
-            category.items.forEach(item => {
-                itemsHtml += `<li>${item.name}: ${item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</li>`;
-            });
-            itemsHtml += `</ul></div>`;
-        }
-
-        const row = `<tr>
-            <td>
-                <span class="dropdown-toggle" onclick="toggleBreakdown(this)">${category.category}</span>
-                ${itemsHtml}
-            </td>
-            <td>${category.total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        </tr>`;
-        expenditureTableBody.innerHTML += row;
-        expenditureTotal += category.total;
-    });
-
-    // Add Total Row
-    const totalRow = `<tr>
-        <td><strong>TOTAL</strong></td>
-        <td><strong>${expenditureTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-    </tr>`;
-    expenditureTableBody.innerHTML += totalRow;
-
-    // Update Balance Table
-    const balanceTableBody = document.querySelector("#balance-table tbody");
-    if (balanceTableBody) {
-        balanceTableBody.innerHTML = ""; // Clear existing rows
-
-        // Calculate Carry Forward if 2025
-        let carryForward = 0;
-        if (year === "2025") {
-            const totals2024 = calculateTotal("2024");
-            carryForward = totals2024.donations - totals2024.expenditure;
-
-            const carryForwardRow = `<tr>
-                <td>Carry Forward (2024)</td>
-                <td>${carryForward.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>`;
-            balanceTableBody.innerHTML += carryForwardRow;
-        }
-
-        const totalCollectionRow = `<tr>
-            <td>Total Collection (${year})</td>
-            <td>${totalDonations.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        </tr>`;
-        balanceTableBody.innerHTML += totalCollectionRow;
-
-        const totalExpenditureRow = `<tr>
-            <td>Total Expenditure (${year})</td>
-            <td>${expenditureTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-        </tr>`;
-        balanceTableBody.innerHTML += totalExpenditureRow;
-
-        const totalBalance = (totalDonations + carryForward) - expenditureTotal;
-        const sign = totalBalance >= 0 ? "+" : "";
-
-        const totalBalanceRow = `<tr>
-            <td><strong>Total Balance</strong></td>
-            <td><strong>${sign}${totalBalance.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></td>
-        </tr>`;
-        balanceTableBody.innerHTML += totalBalanceRow;
-    }
-
-    // Update Holders Table
-    const holdersTableBody = document.querySelector("#holders-table tbody");
-    if (holdersTableBody) {
-        holdersTableBody.innerHTML = "";
-        const holders = holdersData[year] || [];
-        holders.forEach(holder => {
-            const row = `<tr>
-                <td>${holder.name}</td>
-                <td>${holder.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-            </tr>`;
-            holdersTableBody.innerHTML += row;
-        });
-    }
+    const donorCount = data.donations.filter(d => d.name !== "Other Collection").length;
+    document.getElementById("stat-donors").textContent = donorCount;
+    const previousCount = pujaData[previousYear]
+        ? pujaData[previousYear].donations.filter(d => d.name !== "Other Collection").length
+        : 0;
+    document.getElementById("stat-donors-note").textContent =
+        previousCount ? `${previousCount} in ${previousYear}` : "Thank you all";
 }
 
+// --- Donations ---
+
+function renderDonations(year) {
+    const data = pujaData[year];
+    const query = document.getElementById("donor-search").value.trim().toLowerCase();
+    const sort = document.getElementById("donor-sort").value;
+
+    let rows = data.donations.slice();
+    if (sort === "name") rows.sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "high") rows.sort((a, b) => b.amount - a.amount);
+    if (sort === "low") rows.sort((a, b) => a.amount - b.amount);
+    if (query) rows = rows.filter(item => item.name.toLowerCase().includes(query));
+
+    document.querySelector("#donations-table tbody").innerHTML = rows.map((item, i) => `
+        <tr>
+            <td class="col-num">${i + 1}</td>
+            <td>${escapeHtml(item.name)}</td>
+            <td class="col-amount">${formatRs(item.amount)}</td>
+        </tr>`).join("");
+
+    document.getElementById("donor-empty").hidden = rows.length > 0;
+    document.getElementById("donations-total").textContent = formatRs(calculateTotal(year).donations);
+}
+
+// --- Expenditure ---
+
+function renderExpenditure(year) {
+    const data = pujaData[year];
+    const total = calculateTotal(year).expenditure;
+    const largest = Math.max(...data.expenditure.map(c => c.total));
+
+    document.getElementById("expenditure-list").innerHTML = data.expenditure.map(category => {
+        const share = total ? (category.total / total) * 100 : 0;
+        const items = (category.items || []).map(item => `
+            <li><span>${escapeHtml(item.name)}</span><span>${formatRs(item.amount)}</span></li>`).join("");
+        return `
+        <details class="category">
+            <summary>
+                <span class="cat-name">${escapeHtml(category.category)}</span>
+                <span class="cat-amount">${formatRs(category.total)}</span>
+                <span class="cat-bar"><span style="width:${(category.total / largest) * 100}%"></span></span>
+                <span class="cat-share">${share.toFixed(1)}%</span>
+            </summary>
+            <ul class="items">${items}</ul>
+        </details>`;
+    }).join("");
+
+    document.getElementById("expenditure-total").textContent = formatRs(total);
+}
+
+// --- Balance ---
+
+function renderBalance(year) {
+    const totals = calculateTotal(year);
+    const cf = carryForward(year);
+    const balance = closingBalance(year);
+    const previousYear = String(Number(year) - 1);
+
+    const rows = [];
+    if (pujaData[previousYear]) rows.push([`Carry Forward (${previousYear})`, formatRs(cf)]);
+    rows.push([`Total Collection (${year})`, formatRs(totals.donations)]);
+    rows.push([`Total Expenditure (${year})`, "−" + formatRs(totals.expenditure)]);
+
+    const sign = balance >= 0 ? "+" : "−";
+    document.querySelector("#balance-table tbody").innerHTML =
+        rows.map(([label, value]) => `<tr><td>${label}</td><td class="col-amount">${value}</td></tr>`).join("") +
+        `<tr class="total-row"><td>Total Balance</td><td class="col-amount">${sign}${formatRs(Math.abs(balance))}</td></tr>`;
+
+    const holders = holdersData[year] || [];
+    document.querySelector("#holders-table tbody").innerHTML = holders.length
+        ? holders.map(holder => `
+            <tr>
+                <td>${escapeHtml(holder.name)}</td>
+                <td class="col-amount">${formatRs(holder.amount)}</td>
+            </tr>`).join("")
+        : `<tr><td colspan="2" class="muted">Not updated yet</td></tr>`;
+}
+
+function renderData(year) {
+    if (!pujaData[year]) return;
+    document.querySelectorAll(".year-label").forEach(el => el.textContent = year);
+    document.querySelectorAll(".year-btn").forEach(btn =>
+        btn.setAttribute("aria-pressed", btn.dataset.year === year));
+    renderStats(year);
+    renderDonations(year);
+    renderExpenditure(year);
+    renderBalance(year);
+}
+
+// --- Gallery ---
+
+let galleryFilter = "All";
+let visiblePhotos = [];
+let lightboxIndex = 0;
+
+function renderGallery() {
+    const photos = (typeof galleryPhotos !== "undefined" ? galleryPhotos : [])
+        .slice()
+        .sort((a, b) => String(b.year).localeCompare(String(a.year)));
+
+    const tags = ["All", ...new Set(photos.map(p => p.tag).filter(Boolean))];
+    const filters = document.getElementById("gallery-filters");
+    filters.innerHTML = photos.length > 0
+        ? tags.map(tag => `<button class="chip" data-tag="${escapeHtml(tag)}" aria-pressed="${tag === galleryFilter}">${escapeHtml(tag)}</button>`).join("")
+        : "";
+
+    visiblePhotos = galleryFilter === "All" ? photos : photos.filter(p => p.tag === galleryFilter);
+
+    document.getElementById("gallery-grid").innerHTML = visiblePhotos.map((photo, i) => `
+        <button class="photo" data-index="${i}" aria-label="Open ${escapeHtml(photo.caption || "photo")}">
+            <img src="${escapeHtml(photo.src)}" alt="${escapeHtml(photo.caption || "")}" loading="lazy">
+            <span class="photo-meta">
+                <span>${escapeHtml(photo.caption || "")}</span>
+                ${photo.year ? `<span class="photo-year">${escapeHtml(String(photo.year))}</span>` : ""}
+            </span>
+        </button>`).join("");
+
+    document.getElementById("gallery-empty").hidden = visiblePhotos.length > 0;
+}
+
+function openLightbox(index) {
+    lightboxIndex = (index + visiblePhotos.length) % visiblePhotos.length;
+    const photo = visiblePhotos[lightboxIndex];
+    document.getElementById("lb-image").src = photo.src;
+    document.getElementById("lb-image").alt = photo.caption || "";
+    document.getElementById("lb-caption").textContent =
+        [photo.caption, photo.year].filter(Boolean).join(" · ");
+    document.getElementById("lightbox").hidden = false;
+    document.body.style.overflow = "hidden";
+}
+
+function closeLightbox() {
+    document.getElementById("lightbox").hidden = true;
+    document.body.style.overflow = "";
+}
+
+// --- Page setup ---
+
 document.addEventListener("DOMContentLoaded", function () {
-    // Get all tab elements
+    // Tabs
     const tabs = document.querySelectorAll(".tab");
-    const donationTab = document.querySelector("#donations");
-    const expenditureTab = document.querySelector("#expenditure");
-
-    // Initially show the 'Donations' div and set its tab as active
-    if (donationTab) donationTab.style.display = "block";
-    if (expenditureTab) expenditureTab.style.display = "none";
-
     tabs.forEach(tab => {
-        tab.addEventListener("click", function () {
-            // Remove the active class from all tabs
+        tab.addEventListener("click", () => {
             tabs.forEach(t => t.classList.remove("active"));
-            // Add active class to the clicked tab
             tab.classList.add("active");
-
-            // Hide all tab content divs
-            document.querySelectorAll("main > div").forEach(div => div.style.display = "none");
-
-            // Show the clicked tab's content
-            const target = tab.getAttribute("data-target");
-            const targetDiv = document.getElementById(target);
-            if (targetDiv) targetDiv.style.display = "block";
+            document.querySelectorAll(".panel").forEach(panel => panel.classList.remove("active"));
+            document.getElementById(tab.dataset.target).classList.add("active");
         });
     });
 
-    // Year Selector
-    const yearSelect = document.getElementById("year-select");
-    if (yearSelect) {
-        yearSelect.addEventListener("change", (e) => {
-            currentYear = e.target.value;
-            renderData(currentYear);
-        });
-    }
+    // Year switch
+    const yearSwitch = document.getElementById("year-switch");
+    yearSwitch.innerHTML = years.map(year =>
+        `<button class="year-btn" data-year="${year}">${year}</button>`).join("");
+    yearSwitch.addEventListener("click", e => {
+        const btn = e.target.closest(".year-btn");
+        if (!btn) return;
+        currentYear = btn.dataset.year;
+        renderData(currentYear);
+    });
 
-    // Initial Render
+    // Donation search & sort
+    document.getElementById("donor-search").addEventListener("input", () => renderDonations(currentYear));
+    document.getElementById("donor-sort").addEventListener("change", () => renderDonations(currentYear));
+
+    // Gallery filters & lightbox
+    document.getElementById("gallery-filters").addEventListener("click", e => {
+        const chip = e.target.closest(".chip");
+        if (!chip) return;
+        galleryFilter = chip.dataset.tag;
+        renderGallery();
+    });
+    document.getElementById("gallery-grid").addEventListener("click", e => {
+        const photo = e.target.closest(".photo");
+        if (photo) openLightbox(Number(photo.dataset.index));
+    });
+    const lightbox = document.getElementById("lightbox");
+    lightbox.querySelector(".lb-close").addEventListener("click", closeLightbox);
+    lightbox.querySelector(".lb-prev").addEventListener("click", () => openLightbox(lightboxIndex - 1));
+    lightbox.querySelector(".lb-next").addEventListener("click", () => openLightbox(lightboxIndex + 1));
+    lightbox.addEventListener("click", e => { if (e.target === lightbox) closeLightbox(); });
+    document.addEventListener("keydown", e => {
+        if (lightbox.hidden) return;
+        if (e.key === "Escape") closeLightbox();
+        if (e.key === "ArrowLeft") openLightbox(lightboxIndex - 1);
+        if (e.key === "ArrowRight") openLightbox(lightboxIndex + 1);
+    });
+
+    document.getElementById("footer-years").textContent =
+        years.length > 1 ? `${years[years.length - 1]}–${years[0]}` : years[0];
+
     renderData(currentYear);
-});
+    renderGallery();
 
-document.addEventListener("DOMContentLoaded", function () {
-    // Hide splash screen after 3 seconds
-    setTimeout(() => {
-        const splashScreen = document.getElementById("splash-screen");
-        if (splashScreen) {
-            splashScreen.style.animation = "fadeOut 1s ease-out forwards";
-            setTimeout(() => {
-                splashScreen.style.display = "none";
-            }, 1000); // Wait for fade-out animation to finish
-        }
-    }, 3000); // 3 seconds delay
-});
-
-
-function toggleBreakdown(element) {
-    const breakdown = element.nextElementSibling;
-    if (breakdown) {
-        if (breakdown.style.display === "none") {
-            breakdown.style.display = "block";
-        } else {
-            breakdown.style.display = "none";
-        }
+    // Splash screen: show once per visit
+    const splashScreen = document.getElementById("splash-screen");
+    let seen = false;
+    try { seen = sessionStorage.getItem("splashSeen") === "1"; } catch (e) { }
+    if (seen) {
+        splashScreen.style.display = "none";
+    } else {
+        try { sessionStorage.setItem("splashSeen", "1"); } catch (e) { }
+        setTimeout(() => {
+            splashScreen.style.animation = "fadeOut 0.6s ease-out forwards";
+            setTimeout(() => splashScreen.style.display = "none", 600);
+        }, 1800);
     }
-}
+});

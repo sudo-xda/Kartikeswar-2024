@@ -5,133 +5,159 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Kartikeswar Puja Committee</title>
+    <meta name="description" content="Kartikeswar Puja Committee, Karanga - collection, expenditure and photos of every year's puja.">
+    <meta name="theme-color" content="#7b1e22">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Yeseva+One&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <!-- 100% privacy-first analytics -->
     <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
-
 </head>
 
 <body>
-    <header>
-        <h2 class="small-header">Jay Maa Siddha Mangala</h2>
-        <h1>Welcome to Kartikeswar Puja Committee Portal</h1>
-        <div class="year-selector">
-            <label for="year-select">Select Year: </label>
-            <select id="year-select">
-                <option value="2025" selected>2025</option>
-                <option value="2024">2024</option>
-            </select>
+    <div id="splash-screen">
+        <div class="splash-content">
+            <div class="diya" aria-hidden="true"></div>
+            <h1>Omm Shri Kartikeya Namah</h1>
+            <p>Kartikeswar Puja Committee, Karanga</p>
+        </div>
+    </div>
+
+    <header class="hero">
+        <div class="hero-inner">
+            <p class="eyebrow">Jay Maa Siddha Mangala</p>
+            <h1>Kartikeswar Puja Committee</h1>
+            <div class="ornament" aria-hidden="true"><span></span></div>
+            <p class="place">Karanga &middot; Every rupee collected and spent, open to all</p>
+            <div class="year-switch" id="year-switch" role="group" aria-label="Select year">
+                <!-- Year buttons are added from data.js -->
+            </div>
         </div>
     </header>
 
-    <div id="splash-screen">
-        <div class="splash-content">
-            <h1>Omm Shri Kartikeya Namah</h1>
-            <h2>Welcome to</h1>
-                <h2>Kartikeswar Management Portal</h2>
-                <p>Managing with ease and efficiency</p>
+    <section class="stats" aria-label="Summary">
+        <div class="stat">
+            <span class="stat-label">Total Collection</span>
+            <span class="stat-value" id="stat-collection">₹0</span>
+            <span class="stat-note" id="stat-collection-note"></span>
         </div>
-    </div>
+        <div class="stat">
+            <span class="stat-label">Total Expenditure</span>
+            <span class="stat-value" id="stat-expenditure">₹0</span>
+            <span class="stat-note" id="stat-expenditure-note"></span>
+        </div>
+        <div class="stat stat-highlight">
+            <span class="stat-label">Balance in Hand</span>
+            <span class="stat-value" id="stat-balance">₹0</span>
+            <span class="stat-note" id="stat-balance-note"></span>
+        </div>
+        <div class="stat">
+            <span class="stat-label">Donors</span>
+            <span class="stat-value" id="stat-donors">0</span>
+            <span class="stat-note" id="stat-donors-note"></span>
+        </div>
+    </section>
 
-    <!-- Tabs and Main Content -->
-    <div class="tabs">
+    <nav class="tabs" aria-label="Sections">
         <button class="tab active" data-target="donations">Donations</button>
         <button class="tab" data-target="expenditure">Expenditure</button>
-        <button class="tab " data-target="members">Carry Forward</button>
-    </div>
+        <button class="tab" data-target="balance">Balance</button>
+        <button class="tab" data-target="gallery">Gallery</button>
+    </nav>
+
     <main>
-        <div id="donations" class="content active">
-            <table id="donations-table">
+        <section id="donations" class="panel active">
+            <div class="panel-head">
+                <h2>Donations <span class="year-label"></span></h2>
+                <div class="toolbar">
+                    <input type="search" id="donor-search" placeholder="Search name…" aria-label="Search donor name">
+                    <select id="donor-sort" aria-label="Sort donations">
+                        <option value="name">Name A–Z</option>
+                        <option value="high">Amount: high to low</option>
+                        <option value="low">Amount: low to high</option>
+                    </select>
+                </div>
+            </div>
+            <table id="donations-table" class="ledger">
                 <thead>
                     <tr>
+                        <th class="col-num">#</th>
                         <th>Name</th>
-                        <th>Amount</th>
+                        <th class="col-amount">Amount</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <!-- Data rows will be dynamically added here -->
-                </tbody>
+                <tbody></tbody>
                 <tfoot>
                     <tr>
-                        <td><strong>TOTAL</strong></td>
-                        <td><strong>102,708.00</strong></td>
+                        <td></td>
+                        <td>Total</td>
+                        <td class="col-amount" id="donations-total">₹0</td>
                     </tr>
                 </tfoot>
             </table>
-        </div>
+            <p class="empty" id="donor-empty" hidden>No donor matches that name.</p>
+        </section>
 
-        <div id="expenditure" class="content">
-            <table id="expenditure-table">
-                <thead>
-                    <tr>
-                        <th>Item Name</th>
-                        <th>Amount (Rs.)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Data rows will be dynamically added here -->
-                </tbody>
-            </table>
-        </div>
+        <section id="expenditure" class="panel">
+            <div class="panel-head">
+                <h2>Expenditure <span class="year-label"></span></h2>
+                <p class="hint">Tap a category to see every item.</p>
+            </div>
+            <div id="expenditure-list" class="categories"></div>
+            <div class="grand-total">
+                <span>Total Expenditure</span>
+                <span id="expenditure-total">₹0</span>
+            </div>
+        </section>
 
-        <div id="members" class="content">
-            <table id="balance-table">
-                <thead>
-                    <tr>
-                        <th>Description</th>
-                        <th>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Total Collection</td>
-                        <td>0.00</td>
-                    </tr>
-                    <tr>
-                        <td>Total Expenditure</td>
-                        <td>0.00</td>
-                    </tr>
-                    <tr>
-                        <td><strong>Total Balance</strong></td>
-                        <td><strong>0.00</strong></td>
-                    </tr>
-                </tbody>
+        <section id="balance" class="panel">
+            <div class="panel-head">
+                <h2>Balance <span class="year-label"></span></h2>
+            </div>
+            <table id="balance-table" class="ledger">
+                <tbody></tbody>
             </table>
-            <h3>Balance Amount Held By:</h3>
-            <table id="holders-table">
+            <h3>Balance Amount Held By</h3>
+            <table id="holders-table" class="ledger">
                 <thead>
                     <tr>
                         <th>Name</th>
-                        <th>Amount</th>
+                        <th class="col-amount">Amount</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td>Ayashkanta Panda</td>
-                        <td>3,000.00</td>
-                    </tr>
-                    <tr>
-                        <td>Prabir Kumar Jena</td>
-                        <td>1,500.00</td>
-                    </tr>
-                    <tr>
-                        <td>Kuna Rout</td>
-                        <td>1516.00</td>
-                    </tr>
-                </tbody>
+                <tbody></tbody>
             </table>
-        </div>
+        </section>
+
+        <section id="gallery" class="panel">
+            <div class="panel-head">
+                <h2>Gallery</h2>
+                <div class="chips" id="gallery-filters" role="group" aria-label="Filter photos"></div>
+            </div>
+            <div class="gallery-grid" id="gallery-grid"></div>
+            <p class="empty" id="gallery-empty" hidden>Photos from our pujas will appear here soon.</p>
+        </section>
     </main>
 
+    <div id="lightbox" class="lightbox" hidden>
+        <button class="lb-close" aria-label="Close">&times;</button>
+        <button class="lb-nav lb-prev" aria-label="Previous photo">&#8249;</button>
+        <figure>
+            <img id="lb-image" alt="">
+            <figcaption id="lb-caption"></figcaption>
+        </figure>
+        <button class="lb-nav lb-next" aria-label="Next photo">&#8250;</button>
+    </div>
+
     <footer>
-        <p>&copy; 2024 Kartikeswar Puja Committee, Karanga</p>
+        <p>Jay Maa Siddha Mangala &middot; Omm Shri Kartikeya Namah</p>
+        <p>&copy; <span id="footer-years">2024</span> Kartikeswar Puja Committee, Karanga</p>
     </footer>
 
     <script src="data.js"></script>
+    <script src="gallery.js"></script>
     <script src="script.js"></script>
-    <!-- 100% privacy-first analytics -->
-    <script async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
-
 </body>
 
 </html>

@@ -135,9 +135,8 @@ const pujaData = {
       },
       {
         "name": "Kuna Rout",
-        "amount": 4011
+        "amount": 5511
       },
-
       {
         "name": "Lalatendu Saseni",
         "amount": 3000
@@ -290,10 +289,6 @@ const pujaData = {
         "name": "Suryakanta Rout",
         "amount": 1010
       },
-            {
-        "name": "Suryakanta Sethi(GUGU)",
-        "amount": 1500
-      },
       {
         "name": "Tanmaya Rout",
         "amount": 500
@@ -343,10 +338,6 @@ const pujaData = {
         "amount": 500
       },
       {
-        "name": "Chota Chua (18*100)",
-        "amount": 1800
-      },
-      {
         "name": "School Head Maam",
         "amount": 500
       },
@@ -391,6 +382,10 @@ const pujaData = {
         "amount": 200
       },
       {
+        "name": "Divya Rnj Swain",
+        "amount": 1501
+      },
+      {
         "name": "Other Collection",
         "amount": 484
       }
@@ -406,35 +401,27 @@ const pujaData = {
           {
             "name": "Transport",
             "amount": 700
-          },
-          {
-            "name": "Murti Photo",
-            "amount": 65
           }
         ],
-        "total": 13265
+        "total": 13200
       },
       {
         "category": "Tent",
         "items": [
           {
             "name": "Tent",
-            "amount": 12800
+            "amount": 12500
           },
           {
             "name": "Tiffin",
-            "amount": 300
-          },
-          {
-            "name": "Cold Drinks",
-            "amount": 200
+            "amount": 100
           },
           {
             "name": "Every Day Bettery (15*4)",
             "amount": 60
           }
         ],
-        "total": 13360
+        "total": 12660
       },
       {
         "category": "Puja Samagri",
@@ -456,27 +443,15 @@ const pujaData = {
             "amount": 8300
           },
           {
-            "name": "Amba Katha",
-            "amount": 650
-          },
-          {
             "name": "Kula, Dala",
             "amount": 350
           },
           {
             "name": "Kathuli",
             "amount": 200
-          },
-          {
-            "name": "Maa Siddha Mangala Gadhua",
-            "amount": 120
-          },
-          {
-            "name": "Niti Bhoga ( Siba Nana)",
-            "amount": 200
           }
         ],
-        "total": 17180
+        "total": 16210
       },
       {
         "category": "Nana",
@@ -649,7 +624,7 @@ const pujaData = {
         "items": [
           {
             "name": "DJ",
-            "amount": 15500
+            "amount": 15280
           },
           {
             "name": "Dj Safal, Cold Drinks",
@@ -661,7 +636,7 @@ const pujaData = {
           },
           {
             "name": "Rainbow",
-            "amount": 400
+            "amount": 360
           },
           {
             "name": "Bana",
@@ -680,14 +655,14 @@ const pujaData = {
             "amount": 620
           }
         ],
-        "total": 25540
+        "total": 25280
       },
       {
         "category": "Feast",
         "items": [
           {
-            "name": "i) Chiken ( 45 Kg.*228)",
-            "amount": 10260
+            "name": "i) Chiken",
+            "amount": 9120
           },
           {
             "name": "ii)Grocery",
@@ -706,8 +681,8 @@ const pujaData = {
             "amount": 50
           },
           {
-            "name": "vii) Veg Mill(5*110)",
-            "amount": 550
+            "name": "vii) Veg Mill(5*100)",
+            "amount": 500
           },
           {
             "name": "kancha Lanka",
@@ -722,7 +697,7 @@ const pujaData = {
             "amount": 500
           }
         ],
-        "total": 16910
+        "total": 15720
       },
       {
         "category": "Other Expenses",
@@ -774,17 +749,9 @@ const pujaData = {
           {
             "name": "Cold Drinks",
             "amount": 100
-          },
-          {
-            "name": "Pataka",
-            "amount": 200
-          },
-          {
-            "name": "Banner+Card",
-            "amount": 795
           }
         ],
-        "total": 9464
+        "total": 8469
       }
     ]
   },

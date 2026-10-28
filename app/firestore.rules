@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Only people listed in the "members" collection can read or write anything.
+// Copy this whole file into Firebase console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function email() {
+      return request.auth.token.email.lower();
+    }
+
+    // Google logins are always verified. Ready-made IDs use the @kartikeswar.app domain
+    // and can only be created from the Firebase console.
+    function trustedLogin() {
+      return request.auth.token.email_verified == true
+        || email().matches('.*@kartikeswar[.]app$');
+    }
+
+    function isMember() {
+      return request.auth != null
+        && request.auth.token.email != null
+        && trustedLogin()
+        && exists(/databases/$(database)/documents/members/$(email()));
+    }
+
+    match /members/{memberEmail} {
+      allow read, write: if isMember();
+    }
+
+    match /donors/{donorId} {
+      allow read, write: if isMember();
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isMember();
+    }
+
+    // Money entries can be edited or marked deleted, but never erased.
+    match /years/{year}/{kind}/{entryId} {
+      allow read, create, update: if isMember();
+      allow delete: if false;
+    }
+  }
+}
