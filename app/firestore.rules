@@ -35,6 +35,12 @@ service cloud.firestore {
       allow read, write: if isMember();
     }
 
+    // Committee UPI ID and QR image, shown to donors on the public pay page
+    match /public/{docId} {
+      allow read: if true;
+      allow write: if isMember();
+    }
+
     // Money entries can be edited or marked deleted, but never erased.
     match /years/{year}/{kind}/{entryId} {
       allow read, create, update: if isMember();

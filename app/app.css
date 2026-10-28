@@ -19,7 +19,7 @@
     --radius: 14px;
     --shadow: 0 1px 2px rgba(74, 15, 19, 0.06), 0 4px 14px rgba(74, 15, 19, 0.06);
     --heading: 'Yeseva One', Georgia, serif;
-    --body: 'Mukta', 'Segoe UI', Arial, sans-serif;
+    --body: 'Mukta', 'Noto Sans Oriya', 'Segoe UI', Arial, sans-serif;
     --nav-h: 64px;
 }
 
@@ -965,4 +965,347 @@ textarea:focus {
         animation-duration: 0.01ms !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* Countdown, share, language */
+.countdown {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 2px 12px;
+    border-radius: 999px;
+    background: var(--gold-soft);
+    color: var(--maroon-deep);
+    font-size: 0.85rem;
+    font-weight: 600;
+}
+
+.share-btn {
+    margin-bottom: 12px;
+}
+
+.block-line {
+    display: block;
+}
+
+.lang-switch {
+    display: inline-flex;
+    padding: 3px;
+    gap: 2px;
+    border-radius: 999px;
+    background: var(--line);
+}
+
+.lang-switch button {
+    border: 0;
+    background: transparent;
+    padding: 3px 12px;
+    border-radius: 999px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.lang-switch button[aria-pressed="true"] {
+    background: var(--surface);
+    color: var(--maroon);
+    box-shadow: var(--shadow);
+}
+
+.login .lang-switch {
+    margin-bottom: 20px;
+}
+
+.view-head.row-between h1 {
+    margin: 0;
+}
+
+.badge.overdue {
+    background: #fbe4e2;
+    color: var(--red);
+}
+
+/* Cancelled receipts stay listed so numbers have no gaps */
+.entry.cancelled {
+    opacity: 0.55;
+}
+
+.entry.cancelled .entry-amount {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+.receipt {
+    margin: 0;
+    padding: 4px 14px;
+    border-radius: 999px;
+    background: var(--gold-soft);
+    color: var(--maroon-deep);
+    font-weight: 700;
+    letter-spacing: 0.04em;
+}
+
+/* Checklist */
+.group-title {
+    margin: 16px 0 8px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+}
+
+.group-title.neg {
+    color: var(--red);
+}
+
+.tasks {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.task {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    border-bottom: 1px solid var(--line);
+}
+
+.task:last-child {
+    border-bottom: 0;
+}
+
+.check {
+    flex: 0 0 auto;
+    width: 44px;
+    height: 44px;
+    margin-left: 6px;
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    cursor: pointer;
+}
+
+.check .ic {
+    width: 26px;
+    height: 26px;
+    padding: 3px;
+    border: 2px solid var(--line);
+    border-radius: 8px;
+    stroke: transparent;
+    stroke-width: 3;
+}
+
+.check[aria-pressed="true"] .ic {
+    background: var(--green);
+    border-color: var(--green);
+    stroke: #fff;
+}
+
+.task-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 12px 14px 12px 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.task.done .entry-title {
+    text-decoration: line-through;
+    color: var(--muted);
+}
+
+/* Budget */
+.budget-list {
+    margin-top: 8px;
+}
+
+.budget-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    padding: 10px 0;
+    border: 0;
+    border-top: 1px dashed var(--line);
+    background: none;
+    text-align: left;
+    cursor: pointer;
+}
+
+.budget-row .row-between {
+    padding: 0;
+    border: 0;
+}
+
+.bar.over span {
+    background: var(--red);
+}
+
+.vendor-status {
+    padding: 12px;
+    margin-bottom: 14px;
+    border-radius: 12px;
+    background: var(--bg);
+}
+
+.vendor-status h3 {
+    margin: 12px 0 4px;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.vendor-status .btn {
+    margin-top: 10px;
+}
+
+/* UPI QR */
+.upi {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+}
+
+.upi-for {
+    margin: 0;
+    font-size: 1.1rem;
+}
+
+.qr {
+    width: min(260px, 80%);
+    margin: 0 auto;
+    padding: 8px;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+}
+
+.qr svg,
+.qr img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+.qr-image {
+    width: min(320px, 90%);
+}
+
+.upi-id {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--maroon);
+}
+
+.qr-preview {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.qr-preview img {
+    width: 120px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+}
+
+.form details summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: var(--maroon);
+    padding: 4px 0;
+}
+
+.form details[open] {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Photos: payment screenshots & bills */
+.photo-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--muted);
+}
+
+.photo-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.form label.pick-btn {
+    flex: 1 1 140px;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-height: 42px;
+    padding: 8px 12px;
+    border: 1px dashed var(--gold);
+    border-radius: 12px;
+    background: var(--bg);
+    color: var(--ink);
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.pick-btn .ic {
+    width: 18px;
+    height: 18px;
+}
+
+.photo-thumb {
+    width: 96px;
+    height: 96px;
+    object-fit: cover;
+    border-radius: 10px;
+    border: 1px solid var(--line);
+}
+
+.has-photo .ic {
+    width: 14px;
+    height: 14px;
+    color: var(--gold);
+    vertical-align: -2px;
+}
+
+.photo-viewer {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    background: rgba(20, 6, 8, 0.92);
+}
+
+.photo-viewer img {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: 8px;
+}
+
+.photo-viewer .icon-btn {
+    position: absolute;
+    top: 16px;
+    right: 16px;
 }

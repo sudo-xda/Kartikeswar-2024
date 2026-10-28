@@ -1,4 +1,5 @@
 {
+    "id": "./",
     "name": "Kartikeswar Puja Committee",
     "short_name": "Kartikeswar",
     "description": "Collection, follow-up and expenses for Kartikeswar Puja, Karanga",
@@ -9,8 +10,21 @@
     "background_color": "#fbf5ec",
     "theme_color": "#7b1e22",
     "icons": [
-        { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
-        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
-        { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
     ]
 }

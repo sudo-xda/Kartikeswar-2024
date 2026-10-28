@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="or">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kartikeswar Puja – Pay by UPI</title>
+    <meta name="description" content="Contribute to Kartikeswar Puja, Karanga by UPI.">
+    <meta name="theme-color" content="#7b1e22">
+    <link rel="icon" href="app/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&family=Noto+Sans+Oriya:wght@400;600&family=Yeseva+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fbf5ec;
+            --ink: #2b1b17;
+            --muted: #7d6a60;
+            --line: #ecdfcc;
+            --maroon: #7b1e22;
+            --maroon-deep: #4a0f13;
+            --gold: #c9962f;
+            --gold-soft: #f6e7c4;
+            --green: #1f9d55;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Mukta', 'Noto Sans Oriya', 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.5;
+        }
+
+        header {
+            text-align: center;
+            color: #fff;
+            padding: 32px 16px 72px;
+            background: radial-gradient(circle at 50% 120%, rgba(226, 121, 27, 0.55), transparent 60%),
+                linear-gradient(160deg, var(--maroon), var(--maroon-deep));
+        }
+
+        .eyebrow {
+            margin: 0 0 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.16em;
+            text-transform: uppercase;
+            color: var(--gold-soft);
+        }
+
+        h1 {
+            margin: 0;
+            font-family: 'Yeseva One', Georgia, serif;
+            font-weight: 400;
+            font-size: clamp(1.6rem, 6vw, 2.2rem);
+        }
+
+        main {
+            max-width: 420px;
+            margin: -48px auto 32px;
+            padding: 0 16px;
+        }
+
+        .card {
+            background: #fff;
+            border-radius: 16px;
+            box-shadow: 0 6px 20px rgba(74, 15, 19, 0.08);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .greet {
+            margin: 0 0 4px;
+            font-size: 1.1rem;
+        }
+
+        .muted {
+            color: var(--muted);
+            margin: 0;
+        }
+
+        .qr {
+            width: min(280px, 85%);
+            margin: 16px auto;
+            padding: 8px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+        }
+
+        .qr img,
+        .qr svg {
+            display: block;
+            width: 100%;
+            height: auto;
+        }
+
+        label {
+            display: block;
+            text-align: left;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--muted);
+            margin-top: 12px;
+        }
+
+        input {
+            width: 100%;
+            margin-top: 4px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--bg);
+            font: inherit;
+            font-size: 1.1rem;
+        }
+
+        .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            min-height: 46px;
+            margin-top: 10px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+            font: inherit;
+            font-weight: 700;
+            color: var(--ink);
+            text-decoration: none;
+            cursor: pointer;
+        }
+
+        .upi-id {
+            margin: 4px 0 0;
+            font-weight: 700;
+            color: var(--maroon);
+            word-break: break-all;
+        }
+
+        .note {
+            margin-top: 16px;
+            font-size: 0.9rem;
+            color: var(--muted);
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.85rem;
+            padding: 0 16px 32px;
+        }
+
+        footer a {
+            color: var(--maroon);
+        }
+    </style>
+</head>
+
+<body>
+    <header>
+        <p class="eyebrow">ଜୟ ମା ସିଦ୍ଧମଙ୍ଗଳା · Jay Maa Siddha Mangala</p>
+        <h1>Kartikeswar Puja <span id="year"></span></h1>
+        <p>କରଙ୍ଗା · Karanga</p>
+    </header>
+
+    <main>
+        <div class="card" id="card">
+            <p class="muted">Loading…</p>
+        </div>
+    </main>
+
+    <footer>
+        <p>Kartikeswar Puja Committee, Karanga · <a href="./">Collection &amp; expenditure</a></p>
+    </footer>
+
+    <script src="app/vendor/qrcode.js"></script>
+    <script type="module">
+        import { firebaseConfig } from "./app/firebase-config.js";
+
+        const params = new URLSearchParams(location.search);
+        const year = /^\d{4}$/.test(params.get("y") || "") ? params.get("y") : String(new Date().getFullYear());
+        const donor = (params.get("n") || "").slice(0, 80);
+        const startAmount = Number(params.get("am")) > 0 ? String(Number(params.get("am"))) : "";
+        const card = document.getElementById("card");
+        document.getElementById("year").textContent = year;
+
+        const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+        // The UPI ID and QR image come only from the committee's database, never from the link,
+        // so nobody can make a lookalike link that sends money elsewhere.
+        async function loadPay() {
+            const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/public/pay?key=${firebaseConfig.apiKey}`;
+            const response = await fetch(url);
+            if (!response.ok) return null;
+            const fields = (await response.json()).fields || {};
+            const value = key => (fields[key] && fields[key].stringValue) || "";
+            return { upiId: value("upiId"), upiName: value("upiName") || "Kartikeswar Puja Committee", qrImage: value("qrImage") };
+        }
+
+        function upiLink(pay, amount) {
+            const parts = [`pa=${pay.upiId}`, `pn=${encodeURIComponent(pay.upiName)}`, "cu=INR",
+                `tn=${encodeURIComponent(`Kartikeswar Puja ${year}${donor ? " - " + donor : ""}`)}`];
+            if (Number(amount) > 0) parts.push(`am=${Number(amount)}`);
+            return "upi://pay?" + parts.join("&");
+        }
+
+        function qrSvg(text) {
+            const qr = qrcode(0, "M");
+            qr.addData(text);
+            qr.make();
+            return qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true });
+        }
+
+        function show(pay) {
+            const amount = document.getElementById("amount");
+            const value = amount ? amount.value : startAmount;
+            card.innerHTML = `
+                ${donor ? `<p class="greet">ନମସ୍କାର <b>${esc(donor)}</b> 🙏</p>` : ""}
+                <p class="muted">ଯେକୌଣସି UPI ଆପ୍ (GPay, PhonePe, Paytm) ରେ ସ୍କାନ୍ କରନ୍ତୁ<br>Scan with any UPI app</p>
+                ${pay.qrImage ? "" : `
+                    <label>ଟଙ୍କା · Amount (₹)<input id="amount" type="number" inputmode="numeric" min="1" value="${esc(value)}"></label>`}
+                <div class="qr">${pay.qrImage ? `<img src="${esc(pay.qrImage)}" alt="UPI QR code">` : qrSvg(upiLink(pay, value))}</div>
+                ${pay.upiId ? `
+                    <p class="upi-id">${esc(pay.upiId)}</p>
+                    <button class="btn" id="copy">UPI ID କପି କରନ୍ତୁ · Copy UPI ID</button>` : ""}
+                <p class="note">ଦେବା ପରେ ସ୍କ୍ରିନସଟ୍ କମିଟି ସଦସ୍ୟଙ୍କୁ ପଠାନ୍ତୁ।<br>After paying, please send the screenshot to a committee member.</p>`;
+
+            // Changing the amount redraws the generated QR with it filled in
+            const input = document.getElementById("amount");
+            if (input) input.addEventListener("change", () => show(pay));
+            const copy = document.getElementById("copy");
+            if (copy) copy.addEventListener("click", () => {
+                navigator.clipboard.writeText(pay.upiId).then(() => copy.textContent = "✓ Copied", () => { });
+            });
+        }
+
+        loadPay().then(pay => {
+            if (!pay || (!pay.upiId && !pay.qrImage)) {
+                card.innerHTML = `<p class="muted">UPI payment is not set up yet. Please contact a committee member.</p>`;
+                return;
+            }
+            show(pay);
+        }).catch(() => {
+            card.innerHTML = `<p class="muted">Could not load. Please check your internet and try again.</p>`;
+        });
+    </script>
+</body>
+
+</html>
