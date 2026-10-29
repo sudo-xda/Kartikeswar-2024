@@ -47,11 +47,20 @@ The public pay page (`pay.html`) reads the committee UPI ID and QR image from on
 Copy the latest [firestore.rules](firestore.rules) into Firebase console → Firestore Database → **Rules** → **Publish** again.
 Until then the app works, but the UPI ID / QR image are not saved for the pay page.
 
-## Ready-made ID & password (for anyone without Gmail, or iPhone users)
+## Ready-made ID & password (for anyone without Gmail, and for the Android app)
 
-1. Firebase console → **Authentication → Users → Add user** → email `kuna@kartikeswar.app`, choose a password.
-2. In the app: **More → Members** → name `Kuna Rout`, ID `kuna`.
-3. They sign in with **Use ID & password instead** → ID `kuna` + the password.
+In the app: **More → Members**.
+
+- **One person:** name `Kuna Rout`, ID `kuna`, a password (or leave it empty for a random one) → **Add a member**.
+  The login `kuna@kartikeswar.app` is created at once; nothing to do in the Firebase console.
+- **Many at once:** **Add many members**, one per line: `Name, ID, password` (password optional, at least 6 characters).
+  A Gmail address in place of the ID adds a Google sign-in member instead.
+- After adding, tap **Send** next to each person to WhatsApp them their ID, password and the app download link.
+  Passwords are shown only then.
+- They sign in with **Use ID & password instead** → ID `kuna` + the password, and can change it in
+  **More → Members → Change my password**.
+- **Forgotten password:** Firebase console → Authentication → Users → delete that login, then add the member again in the app.
+- Creating logins needs internet. If an ID already has a login, its password is left unchanged.
 
 ## Install on phones
 

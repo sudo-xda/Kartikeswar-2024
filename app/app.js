@@ -2,7 +2,9 @@ import { firebaseConfig } from "./firebase-config.js";
 import { STR, DEFAULT_MESSAGES, DEFAULT_TASKS } from "./i18n.js";
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, onAuthStateChanged, signOut
+    getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, onAuthStateChanged, signOut,
+    initializeAuth, inMemoryPersistence, createUserWithEmailAndPassword, updatePassword,
+    reauthenticateWithCredential, EmailAuthProvider
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
@@ -11,6 +13,9 @@ import {
 
 // Ready-made IDs (e.g. "ravi") become ravi@kartikeswar.app logins
 const ID_DOMAIN = "kartikeswar.app";
+const loginEmail = id => id.includes("@") ? id.trim().toLowerCase() : `${id.trim().toLowerCase()}@${ID_DOMAIN}`;
+const isIdLogin = email => email.endsWith("@" + ID_DOMAIN);
+const APK_LINK = "https://github.com/sudo-xda/Kartikeswar-2024/releases/latest/download/Kartikeswar.apk";
 
 // Past years from the public site's data.js
 const PAST = typeof pujaData !== "undefined" ? pujaData : {};
@@ -1754,11 +1759,32 @@ function viewMembers() {
             <h2>${t("addMember")}</h2>
             <label>${t("name")}<input name="name" required placeholder="Kuna Rout"></label>
             <label>${t("memberEmail")}
-                <input name="email" required autocapitalize="none" placeholder="name@gmail.com  /  kuna">
+                <input name="email" required autocapitalize="none" autocomplete="off" placeholder="kuna  /  name@gmail.com">
             </label>
-            <p class="hint">${t("memberIdHint", { domain: ID_DOMAIN })}</p>
+            <label>${t("memberPassword")}
+                <input name="password" autocapitalize="none" autocomplete="new-password" placeholder="${t("passwordAuto")}">
+            </label>
+            <p class="hint">${t("memberIdHint")}</p>
             <button class="btn primary block">${t("addMember")}</button>
-        </form>`;
+        </form>
+        <form class="panel form" data-form="membersBulk">
+            <h2>${t("addManyMembers")}</h2>
+            <label>${t("addManyLabel")}
+                <textarea name="lines" rows="5" required autocapitalize="none"
+                    placeholder="Kuna Rout, kuna, kuna@1234&#10;Bapi Das, bapi&#10;Ravi Sahu, ravi.sahu@gmail.com"></textarea>
+            </label>
+            <p class="hint">${t("addManyHint")}</p>
+            <button class="btn primary block">${t("addManyBtn")}</button>
+        </form>
+        ${auth.currentUser && isIdLogin(auth.currentUser.email || "") ? `
+        <form class="panel form" data-form="myPassword">
+            <h2>${t("changePassword")}</h2>
+            <label>${t("oldPassword")}<input name="oldPassword" type="password" required autocomplete="current-password"></label>
+            <label>${t("newPassword")}<input name="newPassword" type="password" required minlength="6" autocomplete="new-password"></label>
+            <label>${t("newPassword2")}<input name="newPassword2" type="password" required minlength="6" autocomplete="new-password"></label>
+            <button class="btn primary block">${t("changePassword")}</button>
+        </form>` : ""}
+        <p class="hint">${t("forgotPasswordHint")}</p>`;
 }
 
 function viewSettings() {
@@ -2320,13 +2346,109 @@ function openSavedSheet(donor, amount, collectorEmail, receiptNo, token, given) 
     }
 }
 
+// ---------- Member logins ----------
+
+// New ID logins are made on a second Firebase instance so the person adding them stays signed in
+let creatorAuth;
+async function createLogin(email, password) {
+    if (!creatorAuth) creatorAuth = initializeAuth(initializeApp(firebaseConfig, "creator"), { persistence: inMemoryPersistence });
+    try {
+        await createUserWithEmailAndPassword(creatorAuth, email, password);
+        await signOut(creatorAuth);
+        return "created";
+    } catch (err) {
+        if (err.code === "auth/email-already-in-use") return "exists";
+        throw err;
+    }
+}
+
+const randomPassword = () => "kp" + String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, "0");
+
+function loginError(err) {
+    if (err.code === "auth/network-request-failed") return t("loginNeedsNet");
+    if (err.code === "auth/weak-password") return t("passwordShort");
+    if (err.code === "auth/invalid-email") return t("badMemberId");
+    return err.message;
+}
+
+async function runBusy(button, work) {
+    if (button) button.disabled = true;
+    try { await work(); } finally { if (button) button.disabled = false; }
+}
+
+// Adds each person as a member and, for ready-made IDs, creates their login. Gmail users just sign in with Google.
+async function addMembers(people) {
+    const results = [];
+    const batch = writeBatch(db);
+    for (const person of people) {
+        const result = { ...person, status: "gmail" };
+        if (isIdLogin(person.email)) {
+            try {
+                result.status = await createLogin(person.email, person.password);
+            } catch (err) {
+                results.push({ ...result, status: "error", error: loginError(err) });
+                continue;
+            }
+        }
+        batch.set(doc(db, "members", person.email), { name: person.name, ...stamp(true) });
+        results.push(result);
+    }
+    commit(batch.commit());
+    return results;
+}
+
+const appLink = () => new URL("./", location.href).toString();
+const shortId = email => email.replace("@" + ID_DOMAIN, "");
+
+function loginMessage(r) {
+    if (r.status === "gmail") return t("loginMsgGmail", { name: r.name, link: appLink() });
+    return [
+        t("loginMsgHi", { name: r.name }),
+        t("loginMsgApk", { link: APK_LINK }),
+        t("loginMsgWeb", { link: appLink() }),
+        "",
+        t("loginMsgId", { id: shortId(r.email) }),
+        r.status === "created" ? t("loginMsgPw", { password: r.password }) : t("loginMsgOldPw"),
+        "",
+        t("loginMsgChange")
+    ].join("\n");
+}
+
+function openLoginsSheet(results) {
+    const label = { created: t("loginCreated"), exists: t("loginExists"), gmail: t("loginGmail") };
+    openSheet(t("loginsTitle"), `
+        <p class="hint">${t("loginsHint")}</p>
+        ${results.map(r => `
+            <div class="login-row">
+                <div>
+                    <b>${esc(r.name)}</b>
+                    <span class="muted small">${esc(shortId(r.email))}${r.status === "created" ? ` · ${esc(r.password)}` : ""}</span>
+                    <span class="small ${r.status === "error" ? "warn" : "muted"}">${r.status === "error" ? esc(r.error) : label[r.status]}</span>
+                </div>
+                ${r.status === "error" ? "" : `<a class="btn wa small" href="${esc(waLink("", loginMessage(r)))}"
+                    target="_blank" rel="noopener">${icon("whatsapp")} ${t("sendLogin")}</a>`}
+            </div>`).join("")}
+        <button class="btn block" data-act="close-sheet">${t("done")}</button>`);
+}
+
+// "Name, id, password" per line; the password is optional (a random one is made)
+function parseMemberLines(text) {
+    const people = [], bad = [];
+    text.split("\n").map(line => line.trim()).filter(Boolean).forEach(line => {
+        const [name = "", id = "", password = ""] = line.split(/\s*[,;\t]\s*/);
+        const email = id ? loginEmail(id) : "";
+        if (!name || !/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]+$/.test(email) || (password && password.length < 6)) bad.push(line);
+        else people.push({ name, email, password: password || randomPassword() });
+    });
+    return { people, bad };
+}
+
 // ---------- Saving ----------
 
 const FORMS = {
     login(form) {
         const { id, password } = formValues(form);
-        const email = id.includes("@") ? id.trim() : `${id.trim().toLowerCase()}@${ID_DOMAIN}`;
-        signInWithEmailAndPassword(auth, email, password).catch(() => toast(t("wrongPassword")));
+        signInWithEmailAndPassword(auth, loginEmail(id), password).catch(() => toast(t("wrongPassword")));
     },
 
     async collection(form) {
@@ -2538,14 +2660,48 @@ const FORMS = {
         toast(t("numbersSaved", { n: preview.matched.length + preview.added.length }));
     },
 
-    member(form) {
-        formDirty = false;
+    async member(form, button) {
         const f = formValues(form);
-        let email = f.email.trim().toLowerCase();
-        if (!email.includes("@")) email = `${email}@${ID_DOMAIN}`;
-        commit(setDoc(doc(db, "members", email), { name: f.name.trim(), ...stamp(true) }));
-        form.reset();
-        toast(t("memberAdded", { name: f.name.trim() }));
+        if (f.password && f.password.length < 6) return toast(t("passwordShort"));
+        const { people, bad } = parseMemberLines(`${f.name.replace(/[,;\t]/g, " ")},${f.email},${f.password}`);
+        if (bad.length) return toast(t("badMemberId"));
+        await runBusy(button, async () => {
+            const results = await addMembers(people);
+            formDirty = false;
+            form.reset();
+            openLoginsSheet(results);
+        });
+    },
+
+    async membersBulk(form, button) {
+        const { people, bad } = parseMemberLines(formValues(form).lines);
+        if (bad.length) return toast(t("badMemberLines", { lines: bad.join(" | ") }));
+        if (!people.length) return;
+        await runBusy(button, async () => {
+            const results = await addMembers(people);
+            formDirty = false;
+            form.reset();
+            openLoginsSheet(results);
+        });
+    },
+
+    async myPassword(form, button) {
+        const f = formValues(form);
+        if (f.newPassword.length < 6) return toast(t("passwordShort"));
+        if (f.newPassword !== f.newPassword2) return toast(t("passwordMismatch"));
+        await runBusy(button, async () => {
+            try {
+                const user = auth.currentUser;
+                await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, f.oldPassword));
+                await updatePassword(user, f.newPassword);
+                formDirty = false;
+                form.reset();
+                toast(t("passwordChanged"));
+            } catch (err) {
+                toast(["auth/wrong-password", "auth/invalid-credential", "auth/invalid-login-credentials"].includes(err.code)
+                    ? t("oldPasswordWrong") : loginError(err));
+            }
+        });
     },
 
     settings(form) {

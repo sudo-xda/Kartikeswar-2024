@@ -339,7 +339,8 @@
             <span class="or">ଆରମ୍ଭ</span>
             <h3>Install the app</h3>
             <ul>
-                <li><b>Android app (best):</b> open the <b>Kartikeswar.apk</b> file shared in the WhatsApp group, tap
+                <li><b>Android app (best):</b> open the download link
+                    <a href="https://github.com/sudo-xda/Kartikeswar-2024/releases/latest/download/Kartikeswar.apk">Kartikeswar.apk</a>, tap
                     <b>Install</b> and, if asked, allow "Install unknown apps" once. When the app asks, allow
                     <b>SMS</b> and <b>Notifications</b>. These are needed for SMS reminders and alarms.</li>
                 <li><b>Any phone (browser):</b> open the app link in Chrome, then ⋮ menu → <b>Add to Home screen</b>.
@@ -348,10 +349,13 @@
             <h3>Sign in</h3>
             <ol class="steps">
                 <li>Tap <span class="b">Use ID &amp; password instead</span>.</li>
-                <li>Type the ID and password the committee gave you (for example ID <code>kuna</code>).</li>
+                <li>Type the ID and password the committee sent you on WhatsApp (for example ID <code>kuna</code>).</li>
                 <li>In a browser you can also use <b>Sign in with Google</b> if your Gmail was added as a member.
                     In the Android app, use the ID &amp; password.</li>
             </ol>
+            <h3>Change your password</h3>
+            <p><b>More → Members → Change my password</b>: type your current password, then the new one twice
+                (at least 6 characters).</p>
             <h3>Language</h3>
             <p>Tap <b>More</b> → <b>English / ଓଡ଼ିଆ</b> at the top to switch the app's language. This only changes your phone.</p>
             <div class="tip"><b>Good to know:</b> the app works without internet. Entries are saved on your phone and go up
@@ -566,7 +570,11 @@ Receipt: https://…/receipt.html?r=…</div>
                 <li><b>More → Year, UPI &amp; WhatsApp messages:</b> puja year and date, last year's balance, the main UPI ID
                     and QR, whose account the main UPI is, message language and wording, SMS settings, gentle nudges and
                     donor titles.</li>
-                <li><b>More → Members:</b> add or remove committee members.</li>
+                <li><b>More → Members:</b> add or remove committee members. Type a name and a short ID (like
+                    <code>kuna</code>) and the login is made at once. Leave the password empty for a random one.
+                    <b>Add many members</b> takes one person per line: <code>Name, ID, password</code>. Afterwards tap
+                    <b>Send</b> next to each person to WhatsApp them their ID, password and the app link. A Gmail address
+                    instead of an ID means they sign in with Google.</li>
                 <li><b>More → Donors &amp; phone numbers:</b> add donors or paste many numbers at once (<code>Name, 9876543210</code>).</li>
                 <li><b>More → Download / Export:</b> Excel (CSV) files of everything, for the year-end accounts.</li>
             </ul>
@@ -592,6 +600,11 @@ Receipt: https://…/receipt.html?r=…</div>
             <details>
                 <summary>Can donors see our collection list?</summary>
                 <p>No. Only committee members can open the data. A donor's receipt link shows only their own receipt.</p>
+            </details>
+            <details>
+                <summary>A member forgot their password.</summary>
+                <p>Ask whoever manages the Firebase console to delete that login (Firebase console → Authentication →
+                    Users), then add the member again in <b>More → Members</b> with a new password.</p>
             </details>
             <details>
                 <summary>SMS didn't send.</summary>
