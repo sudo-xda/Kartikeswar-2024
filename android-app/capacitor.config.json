@@ -1,0 +1,18 @@
+{
+  "appId": "in.kartikeswar.app",
+  "appName": "Kartikeswar",
+  "webDir": "www",
+  "server": {
+    "url": "https://sudo-xda.github.io/Kartikeswar-2024/app/",
+    "androidScheme": "https"
+  },
+  "android": {
+    "backgroundColor": "#fbf5ec"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_diya",
+      "iconColor": "#7b1e22"
+    }
+  }
+}

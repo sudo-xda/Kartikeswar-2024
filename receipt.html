@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kartikeswar Puja – Receipt</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#7b1e22">
+    <link rel="icon" href="app/icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&family=Noto+Sans+Oriya:wght@400;600&family=Yeseva+One&display=swap" rel="stylesheet">
+    <style>
+        /* Placeholder receipt design — the committee will finalise the look later */
+        :root {
+            --bg: #fbf5ec;
+            --ink: #2b1b17;
+            --muted: #7d6a60;
+            --line: #ecdfcc;
+            --maroon: #7b1e22;
+            --gold: #c9962f;
+            --gold-soft: #f6e7c4;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Mukta', 'Noto Sans Oriya', 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.5;
+            padding: 24px 16px;
+        }
+
+        .receipt {
+            position: relative;
+            max-width: 480px;
+            margin: 0 auto;
+            background: #fff;
+            border: 1px solid var(--line);
+            border-top: 6px solid var(--maroon);
+            border-radius: 14px;
+            padding: 24px;
+            overflow: hidden;
+        }
+
+        .head {
+            text-align: center;
+            border-bottom: 1px dashed var(--line);
+            padding-bottom: 14px;
+            margin-bottom: 14px;
+        }
+
+        .eyebrow {
+            margin: 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        h1 {
+            margin: 4px 0 0;
+            font-family: 'Yeseva One', Georgia, serif;
+            font-weight: 400;
+            font-size: 1.6rem;
+            color: var(--maroon);
+        }
+
+        .sub {
+            margin: 0;
+            color: var(--muted);
+        }
+
+        .no {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 2px 14px;
+            border-radius: 999px;
+            background: var(--gold-soft);
+            font-weight: 700;
+            letter-spacing: 0.05em;
+        }
+
+        .tier {
+            display: block;
+            width: fit-content;
+            margin: 12px auto 0;
+            padding: 4px 16px;
+            border-radius: 999px;
+            background: var(--maroon);
+            color: #fff;
+            font-weight: 700;
+        }
+
+        .full {
+            color: #1e7a3c;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .row span:first-child {
+            color: var(--muted);
+        }
+
+        .row b {
+            text-align: right;
+        }
+
+        .amount {
+            text-align: center;
+            margin: 18px 0 8px;
+        }
+
+        .amount strong {
+            display: block;
+            font-size: 2.2rem;
+            color: var(--maroon);
+        }
+
+        .thanks {
+            text-align: center;
+            margin: 16px 0 0;
+        }
+
+        .stamp {
+            position: absolute;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-18deg);
+            border: 4px solid #b3261e;
+            color: #b3261e;
+            font-size: 2.4rem;
+            font-weight: 700;
+            padding: 4px 18px;
+            border-radius: 10px;
+            opacity: 0.75;
+            letter-spacing: 0.1em;
+        }
+
+        .actions {
+            max-width: 480px;
+            margin: 16px auto 0;
+            text-align: center;
+        }
+
+        .btn {
+            display: inline-block;
+            min-height: 46px;
+            padding: 10px 24px;
+            border: 0;
+            border-radius: 12px;
+            background: var(--maroon);
+            color: #fff;
+            font: inherit;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .muted {
+            color: var(--muted);
+            text-align: center;
+        }
+
+        @media print {
+            body {
+                background: #fff;
+                padding: 0;
+            }
+
+            .actions {
+                display: none;
+            }
+
+            .receipt {
+                border-radius: 0;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="receipt" id="receipt">
+        <p class="muted">Loading receipt…</p>
+    </div>
+    <div class="actions" id="actions" hidden>
+        <button class="btn" onclick="window.print()">ରସିଦ ଡାଉନଲୋଡ୍ · Download PDF</button>
+    </div>
+
+    <script type="module">
+        import { firebaseConfig } from "./app/firebase-config.js";
+
+        const token = new URLSearchParams(location.search).get("r") || "";
+        const box = document.getElementById("receipt");
+        const esc = value => String(value ?? "").replace(/[&<>"']/g, c =>
+            ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+        const rs = amount => "₹" + Number(amount || 0).toLocaleString("en-IN");
+        const fmtDate = iso => {
+            if (!iso) return "";
+            const [y, m, d] = iso.split("-").map(Number);
+            return new Date(y, m - 1, d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
+        };
+
+        async function load() {
+            if (!/^[a-z0-9]{10,40}$/.test(token)) return null;
+            const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/receipts/${token}?key=${firebaseConfig.apiKey}`;
+            const response = await fetch(url);
+            if (!response.ok) return null;
+            const fields = (await response.json()).fields || {};
+            const value = key => {
+                const f = fields[key] || {};
+                return f.stringValue ?? f.integerValue ?? f.doubleValue ?? "";
+            };
+            return {
+                committee: value("committee"), year: value("year"), receiptNo: value("receiptNo"), name: value("name"),
+                amount: value("amount"), mode: value("mode"), date: value("date"), receivedBy: value("receivedBy"), status: value("status"),
+                pledge: Number(value("pledge")) || 0, totalGiven: Number(value("totalGiven")) || 0,
+                tierEn: value("tierEn"), tierOr: value("tierOr")
+            };
+        }
+
+        load().then(r => {
+            if (!r) {
+                box.innerHTML = `<p class="muted">This receipt link is not valid. Please contact the committee.</p>`;
+                return;
+            }
+            document.title = `Receipt ${r.receiptNo} – Kartikeswar Puja`;
+            box.innerHTML = `
+                ${r.status === "cancelled" ? `<div class="stamp">CANCELLED</div>` : ""}
+                <div class="head">
+                    <p class="eyebrow">ଜୟ ମା ସିଦ୍ଧମଙ୍ଗଳା · Jay Maa Siddha Mangala</p>
+                    <h1>Kartikeswar Puja ${esc(r.year)}</h1>
+                    <p class="sub">${esc(r.committee)}</p>
+                    <span class="no">${esc(r.receiptNo)}</span>
+                </div>
+                <div class="amount"><span class="sub">ଦାନ ରାଶି · Amount received</span><strong>${rs(r.amount)}</strong></div>
+                <div class="row"><span>ଦାତା · Donor</span><b>${esc(r.name)}</b></div>
+                <div class="row"><span>ତାରିଖ · Date</span><b>${esc(fmtDate(r.date))}</b></div>
+                <div class="row"><span>ମାଧ୍ୟମ · Paid by</span><b>${esc(r.mode)}</b></div>
+                <div class="row"><span>ଗ୍ରହଣକାରୀ · Received by</span><b>${esc(r.receivedBy)}</b></div>
+                ${r.pledge ? `
+                    <div class="row"><span>ମୋଟ ମିଳିଲା · Total given</span><b>${rs(r.totalGiven)} / ${rs(r.pledge)}</b></div>
+                    ${r.totalGiven >= r.pledge
+                        ? `<div class="row"><span>ସ୍ଥିତି · Status</span><b class="full">ସମ୍ପୂର୍ଣ୍ଣ · Fully paid ✓</b></div>`
+                        : `<div class="row"><span>ବାକି · Pending</span><b>${rs(r.pledge - r.totalGiven)}</b></div>`}` :
+                  r.totalGiven > Number(r.amount) ? `
+                    <div class="row"><span>ଏ ବର୍ଷ ମୋଟ · Total this year</span><b>${rs(r.totalGiven)}</b></div>` : ""}
+                ${r.tierEn && r.status !== "cancelled" ? `<span class="tier">${esc(r.tierOr && r.tierOr !== r.tierEn ? r.tierOr + " · " + r.tierEn : r.tierEn)}</span>` : ""}
+                <p class="thanks">ଆପଣଙ୍କ ସହଯୋଗ ପାଇଁ ଅନେକ ଧନ୍ୟବାଦ 🙏<br>Thank you for your support</p>`;
+            document.getElementById("actions").hidden = false;
+        }).catch(() => {
+            box.innerHTML = `<p class="muted">Could not load. Please check your internet and try again.</p>`;
+        });
+    </script>
+</body>
+
+</html>

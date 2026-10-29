@@ -41,6 +41,14 @@ service cloud.firestore {
       allow write: if isMember();
     }
 
+    // Public receipt pages: anyone with the (long, random) link can open one receipt,
+    // but nobody can list or search them.
+    match /receipts/{token} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if isMember();
+    }
+
     // Money entries can be edited or marked deleted, but never erased.
     match /years/{year}/{kind}/{entryId} {
       allow read, create, update: if isMember();

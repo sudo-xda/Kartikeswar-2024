@@ -1,0 +1,8 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kartikeswar</string>
+    <string name="title_activity_main">Kartikeswar</string>
+    <string name="package_name">in.kartikeswar.app</string>
+    <string name="custom_url_scheme">in.kartikeswar.app</string>
+    <string name="widget_description">Today\'s collection and donors yet to pay</string>
+</resources>

@@ -188,6 +188,8 @@
         const year = /^\d{4}$/.test(params.get("y") || "") ? params.get("y") : String(new Date().getFullYear());
         const donor = (params.get("n") || "").slice(0, 80);
         const startAmount = Number(params.get("am")) > 0 ? String(Number(params.get("am"))) : "";
+        // A committee member's own UPI (only the key of their record, never the UPI ID itself)
+        const memberKey = /^[a-z0-9]{6,40}$/.test(params.get("m") || "") ? params.get("m") : "";
         const card = document.getElementById("card");
         document.getElementById("year").textContent = year;
 
@@ -196,13 +198,22 @@
 
         // The UPI ID and QR image come only from the committee's database, never from the link,
         // so nobody can make a lookalike link that sends money elsewhere.
-        async function loadPay() {
-            const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/public/pay?key=${firebaseConfig.apiKey}`;
+        async function loadDoc(id) {
+            const url = `https://firestore.googleapis.com/v1/projects/${firebaseConfig.projectId}/databases/(default)/documents/public/${id}?key=${firebaseConfig.apiKey}`;
             const response = await fetch(url);
             if (!response.ok) return null;
             const fields = (await response.json()).fields || {};
             const value = key => (fields[key] && fields[key].stringValue) || "";
             return { upiId: value("upiId"), upiName: value("upiName") || "Kartikeswar Puja Committee", qrImage: value("qrImage") };
+        }
+
+        // The member's own UPI if the link has one and it is still on, otherwise the main committee QR
+        async function loadPay() {
+            if (memberKey) {
+                const own = await loadDoc("m-" + memberKey).catch(() => null);
+                if (own && (own.upiId || own.qrImage)) return own;
+            }
+            return loadDoc("pay");
         }
 
         function upiLink(pay, amount) {
@@ -224,6 +235,7 @@
             const value = amount ? amount.value : startAmount;
             card.innerHTML = `
                 ${donor ? `<p class="greet">ନମସ୍କାର <b>${esc(donor)}</b> 🙏</p>` : ""}
+                <p class="muted">ଟଙ୍କା ଯିବ · Paying to <b>${esc(pay.upiName)}</b></p>
                 <p class="muted">ଯେକୌଣସି UPI ଆପ୍ (GPay, PhonePe, Paytm) ରେ ସ୍କାନ୍ କରନ୍ତୁ<br>Scan with any UPI app</p>
                 ${pay.qrImage ? "" : `
                     <label>ଟଙ୍କା · Amount (₹)<input id="amount" type="number" inputmode="numeric" min="1" value="${esc(value)}"></label>`}

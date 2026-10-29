@@ -25,6 +25,16 @@ if (configured) {
     });
 }
 
+// ---------- Android app (Capacitor) ----------
+// Inside the Android app these native features exist; in a browser Native is null.
+const Cap = window.Capacitor;
+const isNative = Boolean(Cap && Cap.isNativePlatform && Cap.isNativePlatform());
+const Native = isNative ? {
+    sms: Cap.registerPlugin("KpSms"),
+    widget: Cap.registerPlugin("KpWidget"),
+    notifications: Cap.registerPlugin("LocalNotifications")
+} : null;
+
 // ---------- Language ----------
 
 let lang = "en";
@@ -153,7 +163,7 @@ const PAST_CATEGORIES = (() => {
 
 // UPI payment string read by every UPI app (GPay, PhonePe, Paytm, BHIM…)
 function upiString(amount, note) {
-    const s = state.settings;
+    const s = payInfo();
     const params = [`pa=${String(s.upiId).trim()}`, `pn=${encodeURIComponent(s.upiName || "Kartikeswar Puja Committee")}`, "cu=INR"];
     if (Number(amount) > 0) params.push(`am=${Number(amount)}`);
     if (note) params.push(`tn=${encodeURIComponent(note)}`);
@@ -165,6 +175,7 @@ function payLink(donorName, amount) {
     if (!hasUpi()) return "";
     const url = new URL("../pay.html", location.href);
     url.searchParams.set("y", year());
+    if (payInfo().key) url.searchParams.set("m", payInfo().key);
     if (donorName) url.searchParams.set("n", donorName);
     if (Number(amount) > 0) url.searchParams.set("am", String(Number(amount)));
     return url.toString();
@@ -200,6 +211,13 @@ const DEFAULT_SETTINGS = {
     upiId: "",
     upiName: "Kartikeswar Puja Committee",
     msgLang: "or",
+    autoReceiptSms: true,
+    smsDailyLimit: 90,
+    upiOwner: "",
+    nudgeCrowd: true,
+    nudgeCommon: true,
+    nudgeTier: true,
+    tiers: "5001 = Maha Sevak / ମହା ସେବକ\n2001 = Pradhan Sevak / ପ୍ରଧାନ ସେବକ\n1001 = Sevak / ସେବକ",
     ...DEFAULT_MESSAGES
 };
 
@@ -219,10 +237,12 @@ const state = {
     tasks: [],
     budget: {},
     publicPay: {}, // UPI ID, payee name and QR image shown on the public pay page
+    myPay: {}, // this member's own UPI ID and QR image (public/m-<payKey>), if they added one
     pendingQr: undefined, // QR image chosen in Settings but not saved yet ("" = remove)
     pendingPhoto: undefined, // photo picked in the open collection/expense form ("" = remove)
     photoEntry: null, // the entry that form is editing
     queue: null, // running reminder queue: { ids, index, sent, skipped, sentCurrent }
+    smsRun: null, // running SMS batch: { ids, index, sent, failed, stopped, done, limitHit }
     search: {},
     fuFilter: "todo",
     entriesTab: "collections"
@@ -243,13 +263,30 @@ function scheduleRender() {
 }
 
 const year = () => state.settings.year;
-const hasUpi = () => Boolean(state.settings.upiId || state.publicPay.qrImage);
 const prevYear = () => String(Number(year()) - 1);
 const yearPath = kind => `years/${year()}/${kind}`;
 const donorById = id => state.donors.find(d => d.id === id);
 const vendorById = id => state.vendors.find(v => v.id === id);
-const BANK = "bank"; // UPI money lands in the committee account, not in anyone's hand
-const memberName = email => email === BANK ? t("bankAccount") : (state.members.find(m => m.id === email) || {}).name || email || "";
+const BANK = "bank"; // money paid to the main committee QR (it is someone's personal account)
+const memberName = email => {
+    if (email === BANK) {
+        const owner = state.members.find(m => m.id === state.settings.upiOwner);
+        return owner ? `${t("bankAccount")} (${owner.name})` : t("bankAccount");
+    }
+    return (state.members.find(m => m.id === email) || {}).name || email || "";
+};
+
+// The UPI this member hands out: their own if they added one, otherwise the main committee QR
+function payInfo() {
+    const me = state.me || {};
+    if (me.payKey && (me.upiId || state.myPay.qrImage)) {
+        return { upiId: me.upiId || "", upiName: me.upiName || me.name || "", qrImage: state.myPay.qrImage || "", key: me.payKey };
+    }
+    return { upiId: state.settings.upiId || "", upiName: state.settings.upiName || "", qrImage: state.publicPay.qrImage || "", key: "" };
+}
+const hasUpi = () => Boolean(payInfo().upiId || payInfo().qrImage);
+// Members whose own UPI can receive money (for "UPI paid into" on a collection)
+const ownUpiMembers = () => state.members.filter(m => m.payKey && m.hasOwnUpi);
 const receiptLabel = number => number ? `KP-${year()}-${String(number).padStart(3, "0")}` : "";
 
 function stamp(isNew) {
@@ -290,6 +327,7 @@ function stopData() {
     yearUnsubs.forEach(unsub => unsub());
     dataUnsubs = [];
     yearUnsubs = [];
+    watchMyPay("");
 }
 
 function watchMembership(user) {
@@ -302,6 +340,7 @@ function watchMembership(user) {
             state.memberStatus = "denied";
         } else {
             state.me = { id: email, ...snap.data() };
+            watchMyPay(state.me.payKey);
             if (state.memberStatus !== "ok") {
                 state.memberStatus = "ok";
                 startData();
@@ -311,6 +350,22 @@ function watchMembership(user) {
     }, onDataError));
 }
 
+// This member's own QR image lives in a public document so the pay page can show it
+let myPayKey = "";
+let myPayUnsub = null;
+function watchMyPay(key) {
+    if ((key || "") === myPayKey) return;
+    if (myPayUnsub) myPayUnsub();
+    myPayUnsub = null;
+    myPayKey = key || "";
+    state.myPay = {};
+    if (!myPayKey) return;
+    myPayUnsub = onSnapshot(doc(db, "public", "m-" + myPayKey), snap => {
+        state.myPay = snap.exists() ? snap.data() : {};
+        scheduleRender();
+    }, () => { });
+}
+
 function startData() {
     dataUnsubs.push(onSnapshot(collection(db, "members"), snap => {
         state.members = active(toList(snap)).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
@@ -318,8 +373,11 @@ function startData() {
     }, onDataError));
 
     dataUnsubs.push(onSnapshot(collection(db, "donors"), snap => {
+        const firstLoad = !state.donors.length;
         state.donors = active(toList(snap));
         scheduleRender();
+        // The app may have been closed during a call; ask about it once the donors are loaded
+        if (firstLoad) setTimeout(checkPendingCall, 800);
     }, onDataError));
 
     // Not fatal if unreadable (e.g. rules not updated yet): the app just works without the QR image
@@ -371,12 +429,50 @@ function nextReceipt(tx) {
     return tx.get(counterRef()).then(snap => (snap.exists() ? Number(snap.data().receipt) || 0 : 0) + 1);
 }
 
+// Each receipt also gets a public page (receipt.html?r=<token>) that only someone with the
+// link can open. The token is long and random, so receipts cannot be guessed or listed.
+function newToken() {
+    const bytes = new Uint8Array(16);
+    crypto.getRandomValues(bytes);
+    return [...bytes].map(b => (b % 36).toString(36)).join("");
+}
+
+const receiptRef = token => doc(db, "receipts", token);
+const receiptLink = token => token ? new URL(`../receipt.html?r=${token}`, location.href).toString() : "";
+
+// entry needs its id (and createdAt / receiptNo once saved) so the running total counts only earlier payments
+function saveReceiptPage(token, entry, number) {
+    const donor = donorById(entry.donorId);
+    const given = givenUpTo({ ...entry, receiptNo: number });
+    const tier = state.settings.nudgeTier !== false ? tierFor(given) : null;
+    commit(setDoc(receiptRef(token), {
+        pledge: donor ? pledgeOf(donor).pledge : 0,
+        totalGiven: given,
+        tierEn: tier ? tier.en : "",
+        tierOr: tier ? tier.or : "",
+        committee: "Kartikeswar Puja Committee, Karanga",
+        year: year(),
+        receiptNo: receiptLabel(number),
+        name: entry.donorName,
+        amount: Number(entry.amount),
+        mode: entry.mode === "upi" ? "UPI" : "Cash",
+        date: entry.date,
+        receivedBy: memberName(entry.collectedBy),
+        status: "valid",
+        updatedAt: serverTimestamp()
+    }, { merge: true }));
+}
+
 function saveWithReceipt(ref, data) {
+    const token = newToken();
     const attempt = runTransaction(db, async tx => {
         const number = await nextReceipt(tx);
         tx.set(counterRef(), { receipt: number }, { merge: true });
-        tx.set(ref, { ...data, receiptNo: number });
+        tx.set(ref, { ...data, receiptNo: number, receiptToken: token });
         return number;
+    }).then(number => {
+        saveReceiptPage(token, { ...data, id: ref.id }, number);
+        return { number, token };
     });
     const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 6000));
     return Promise.race([attempt, timeout]);
@@ -389,12 +485,20 @@ function assignMissingReceipts() {
         .forEach(c => {
             numbering.add(c.id);
             const ref = doc(db, yearPath("collections"), c.id);
+            const token = newToken();
             runTransaction(db, async tx => {
                 const entry = await tx.get(ref);
-                if (!entry.exists() || entry.data().receiptNo) return;
+                if (!entry.exists() || entry.data().receiptNo) return null;
                 const number = await nextReceipt(tx);
                 tx.set(counterRef(), { receipt: number }, { merge: true });
-                tx.set(ref, { receiptNo: number }, { merge: true });
+                tx.set(ref, { receiptNo: number, receiptToken: token }, { merge: true });
+                return number;
+            }).then(number => {
+                if (!number) return;
+                // Entry was saved offline: its receipt page and SMS go out now
+                saveReceiptPage(token, c, number);
+                const donor = donorById(c.donorId);
+                if (donor) sendReceiptSms(donor, c.amount, number, token, givenUpTo({ ...c, receiptNo: number }));
             }).catch(() => { }).finally(() => numbering.delete(c.id));
         });
 }
@@ -416,6 +520,116 @@ function paidMap() {
 
 const followup = donor => (donor.fu && donor.fu[year()]) || {};
 
+// Promised amount vs what has come in so far. A donor counts as paid once the promise is met,
+// the promise is closed, or (with no promise) after any payment.
+function pledgeOf(donor, paid = paidMap()) {
+    const fu = followup(donor);
+    const given = paid.get(donor.id) || 0;
+    const pledge = Number(fu.promised) || 0;
+    const due = fu.closed ? 0 : Math.max(0, pledge - given);
+    return { given, pledge, due, closed: Boolean(fu.closed), partial: given > 0 && due > 0, done: given > 0 && due === 0 };
+}
+
+// Everyone with promised money still to come, biggest amount first
+function pledgesDue() {
+    const paid = paidMap();
+    return state.donors.map(d => ({ name: d.name, status: followup(d).status, ...pledgeOf(d, paid) }))
+        .filter(p => p.due > 0 && (p.status !== "declined" || p.given))
+        .sort((a, b) => b.due - a.due);
+}
+
+// Total a donor had given up to and including this collection (receipts show the running total)
+function givenUpTo(entry) {
+    const isNew = !millis(entry.createdAt);
+    const earlier = state.collections.filter(c => c.donorId === entry.donorId && c.id !== entry.id && (isNew ||
+        (c.receiptNo && entry.receiptNo ? c.receiptNo < entry.receiptNo : millis(c.createdAt) < millis(entry.createdAt))));
+    return sum(earlier) + Number(entry.amount || 0);
+}
+
+// Donor titles from Settings, e.g. "2001 = Pradhan Sevak / ପ୍ରଧାନ ସେବକ", biggest first
+function tierList() {
+    return String(state.settings.tiers || "").split("\n").map(line => {
+        const match = line.match(/^\s*(\d+)\s*=\s*([^/]+?)\s*(?:\/\s*(.+?))?\s*$/);
+        return match && { min: Number(match[1]), en: match[2], or: match[3] || match[2] };
+    }).filter(Boolean).sort((a, b) => b.min - a.min);
+}
+const tierFor = amount => amount > 0 ? tierList().find(tier => amount >= tier.min) || null : null;
+const tierText = tier => state.settings.msgLang === "en" ? tier.en : tier.or;
+
+// The amount range most families are giving: middle half of this year's donors (or last year's
+// until ten have paid), rounded to the usual donation amounts
+const NICE_AMOUNTS = [101, 151, 201, 251, 301, 501, 701, 1001, 1101, 1501, 2001, 2501, 3001, 5001, 10001];
+function commonRange() {
+    let amounts = [...paidMap().values()];
+    if (amounts.length < 10 && PAST[prevYear()]) amounts = PAST[prevYear()].donations.map(d => Number(d.amount));
+    amounts = amounts.filter(a => a > 0).sort((a, b) => a - b);
+    if (amounts.length < 10) return null;
+    const nice = value => NICE_AMOUNTS.reduce((best, a) => Math.abs(a - value) < Math.abs(best - value) ? a : best);
+    const at = q => nice(amounts[Math.floor((amounts.length - 1) * q)]);
+    return { from: at(0.25), to: at(0.75) };
+}
+
+// Message text in the message language (Settings), not the phone's language
+function mt(key, vars = {}) {
+    const entry = STR[key];
+    const text = entry ? entry[state.settings.msgLang === "en" ? 0 : 1] : key;
+    return text.replace(/\{(\w+)\}/g, (match, name) => vars[name] !== undefined ? vars[name] : match);
+}
+const inr = amount => Math.round(Number(amount) || 0).toLocaleString("en-IN");
+
+// Put extra lines just above the pay link (or above the sign-off when there is none)
+function withLines(text, lines, anchor) {
+    lines = lines.filter(Boolean);
+    if (!lines.length) return text;
+    const rows = text.split("\n");
+    let at = anchor ? rows.findIndex(row => row.includes(anchor)) : -1;
+    if (at < 0) {
+        const blank = rows.lastIndexOf("");
+        at = blank > 0 ? blank : rows.length;
+    }
+    rows.splice(at, 0, ...lines);
+    return rows.join("\n");
+}
+
+// Pledge progress, encouragement and title lines for a reminder (WhatsApp gets all, SMS only the pledge)
+function reminderLines(donor, forSms) {
+    const s = state.settings;
+    const p = pledgeOf(donor);
+    const lines = [];
+    if (p.partial) lines.push(mt("msgPartial", { given: inr(p.given), pledge: inr(p.pledge), due: inr(p.due) }));
+    if (forSms) return lines;
+    const paid = paidMap();
+    if (s.nudgeCrowd !== false && paid.size >= 5) lines.push(mt("msgCrowd", { n: paid.size, total: inr(sum(state.collections)) }));
+    if (!p.partial) {
+        const base = Math.max(p.pledge, (lastGift(donor) || {}).amount || 0);
+        // Only for donors below the usual range; a big donor should not read "most give less"
+        const range = s.nudgeCommon !== false && commonRange();
+        if (range && base < range.to) lines.push(range.from === range.to
+            ? mt("msgCommonOne", { from: inr(range.from) })
+            : mt("msgCommon", { from: inr(range.from), to: inr(range.to) }));
+        // Suggest the next title above what they promised or gave last year
+        const next = s.nudgeTier !== false && base > 0 && tierList().slice().reverse().find(tier => tier.min > base);
+        if (next && next.min <= base * 2) lines.push(mt("msgTierNext", { amount: inr(next.min), tier: tierText(next) }));
+    }
+    return lines;
+}
+
+// Running total and title lines for a thank-you / receipt message
+function thanksLines(donor, amount, given, forSms) {
+    const p = pledgeOf(donor);
+    const lines = [];
+    if (p.pledge && !p.closed) {
+        lines.push(given >= p.pledge
+            ? mt("msgPledgeDone", { pledge: inr(p.pledge) })
+            : mt("msgPledgeProgress", { given: inr(given), pledge: inr(p.pledge), due: inr(p.pledge - given) }));
+    } else if (given > Number(amount)) {
+        lines.push(mt("msgTotalGiven", { given: inr(given) }));
+    }
+    const tier = !forSms && state.settings.nudgeTier !== false && tierFor(given);
+    if (tier) lines.push(mt("msgTier", { tier: tierText(tier) }));
+    return lines;
+}
+
 function totals() {
     const collected = sum(state.collections);
     const spent = sum(state.expenses);
@@ -424,7 +638,7 @@ function totals() {
 
     const held = new Map();
     const add = (email, amount) => email && email !== "opening" && held.set(email, (held.get(email) || 0) + amount);
-    state.collections.forEach(c => add(c.mode === "upi" ? BANK : c.collectedBy, Number(c.amount)));
+    state.collections.forEach(c => add(c.mode === "upi" ? c.upiTo || BANK : c.collectedBy, Number(c.amount)));
     state.expenses.forEach(e => add(e.paidBy, -Number(e.amount)));
     state.moves.forEach(m => {
         add(m.to, Number(m.amount));
@@ -460,14 +674,16 @@ function categories() {
 function followupGroups() {
     const paid = paidMap();
     const now = today();
-    const groups = { todo: [], calls: [], promised: [], mine: [], fresh: [], paid: [], declined: [] };
+    const groups = { todo: [], calls: [], promised: [], partial: [], mine: [], fresh: [], paid: [], declined: [] };
     state.donors.forEach(d => {
         const fu = followup(d);
-        if (paid.has(d.id)) return groups.paid.push(d);
-        if (fu.status === "declined") return groups.declined.push(d);
+        const p = pledgeOf(d, paid);
+        if (p.done) return groups.paid.push(d);
+        if (fu.status === "declined" && !p.partial) return groups.declined.push(d);
         groups.todo.push(d);
         if (fu.status === "later" && fu.callOn && fu.callOn <= now) groups.calls.push(d);
-        if (fu.status === "promised") groups.promised.push(d);
+        if (p.partial) groups.partial.push(d);
+        else if (fu.status === "promised") groups.promised.push(d);
         if (fu.assignedTo === state.me.id) groups.mine.push(d);
         if (!fu.contactedAt && !fu.status) groups.fresh.push(d);
     });
@@ -486,10 +702,11 @@ const VIEWS = {
     donors: viewDonors,
     members: viewMembers,
     settings: viewSettings,
+    myupi: viewMyUpi,
     export: viewExport
 };
 const LISTS = { followup: followupList, entries: entriesList, donors: donorsList };
-const NAV_PARENT = { tasks: "more", spending: "more", donors: "more", members: "more", settings: "more", export: "more" };
+const NAV_PARENT = { tasks: "more", spending: "more", donors: "more", members: "more", settings: "more", myupi: "more", export: "more" };
 
 function currentView() {
     const view = location.hash.slice(1);
@@ -549,6 +766,95 @@ function render() {
             el.focus();
             if (caret !== null && el.setSelectionRange) el.setSelectionRange(caret, caret);
         }
+    }
+    syncNative();
+}
+
+// ---------- Android: home-screen widget and alarms ----------
+
+let widgetTimer = null;
+let alarmTimer = null;
+let alarmSignature = "";
+
+function syncNative() {
+    if (!isNative || state.memberStatus !== "ok") return;
+    clearTimeout(widgetTimer);
+    widgetTimer = setTimeout(updateWidget, 1500);
+    clearTimeout(alarmTimer);
+    alarmTimer = setTimeout(scheduleAlarms, 4000);
+}
+
+function updateWidget() {
+    const now = new Date();
+    const { groups } = followupGroups();
+    Native.widget.update({
+        title: `Kartikeswar Puja ${year()}`,
+        today: rs(sum(state.collections.filter(c => c.date === today()))),
+        total: rs(totals().collected),
+        pending: String(groups.todo.length),
+        labelToday: t("wToday"),
+        labelTotal: t("wTotal"),
+        labelPending: t("wPending"),
+        updated: t("wUpdated", { time: now.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) })
+    }).catch(() => { });
+}
+
+// Stable positive number for a notification id
+function alarmId(key) {
+    let hash = 0;
+    for (const ch of key) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
+    return Math.abs(hash) || 1;
+}
+
+const atTime = (iso, time) => new Date(`${iso}T${time || "10:00"}:00`).getTime();
+
+// Call-backs and checklist tasks ring on this phone at the right time, even when the app is closed.
+// Items assigned to someone else are left to their phone.
+async function scheduleAlarms() {
+    const mine = who => !who || who === state.me.id;
+    const now = Date.now();
+    const paid = paidMap();
+    const items = [];
+    state.donors.forEach(d => {
+        const fu = followup(d);
+        if (pledgeOf(d, paid).done || fu.status !== "later" || !fu.callOn || !mine(fu.assignedTo)) return;
+        const at = atTime(fu.callOn, fu.callTime);
+        if (at > now) items.push({ key: "call-" + d.id, at, title: t("notifCall", { name: d.name }), body: fu.note || (d.phone || ""), hash: "#followup" });
+    });
+    state.tasks.forEach(task => {
+        if (task.done || !task.due || !mine(task.assignedTo)) return;
+        const at = atTime(task.due, "09:00");
+        if (at > now) items.push({ key: "task-" + task.id, at, title: t("notifTask", { task: task.title }), body: task.note || t("checklist"), hash: "#tasks" });
+    });
+    items.sort((a, b) => a.at - b.at);
+    const chosen = items.slice(0, 40);
+    const signature = JSON.stringify(chosen.map(n => [n.key, n.at, n.title, n.body]));
+    if (signature === alarmSignature) return;
+
+    try {
+        const N = Native.notifications;
+        let permission = await N.checkPermissions();
+        if (permission.display !== "granted") permission = await N.requestPermissions();
+        if (permission.display !== "granted") return;
+        let old = [];
+        try { old = JSON.parse(localStorage.getItem("kpAlarmIds") || "[]"); } catch (e) { }
+        if (old.length) await N.cancel({ notifications: old.map(id => ({ id })) });
+        if (chosen.length) {
+            await N.schedule({
+                notifications: chosen.map(n => ({
+                    id: alarmId(n.key),
+                    title: n.title,
+                    body: n.body,
+                    schedule: { at: new Date(n.at), allowWhileIdle: true },
+                    smallIcon: "ic_stat_diya",
+                    extra: { hash: n.hash }
+                }))
+            });
+        }
+        localStorage.setItem("kpAlarmIds", JSON.stringify(chosen.map(n => alarmId(n.key))));
+        alarmSignature = signature;
+    } catch (e) {
+        // Alarms are a convenience; the app works without them
     }
 }
 
@@ -621,7 +927,7 @@ function viewHome() {
     const lastYearTotal = PAST[prevYear()] ? sum(PAST[prevYear()].donations) : 0;
     const progress = lastYearTotal ? Math.min(100, (tt.collected / lastYearTotal) * 100) : 0;
     const { groups } = followupGroups();
-    const promisedTotal = sum(groups.promised.map(d => ({ amount: followup(d).promised })));
+    const owed = pledgesDue();
 
     const holders = [...tt.held.entries()].filter(([, amount]) => amount !== 0).sort((a, b) => b[1] - a[1]);
     const recent = [
@@ -687,7 +993,7 @@ function viewHome() {
         <a class="panel link-panel" href="#followup">
             <h2>${t("navFollowup")}</h2>
             <div class="row-between"><span>${t("yetToPay")}</span><b>${groups.todo.length}</b></div>
-            <div class="row-between"><span>${t("promisedPending")}</span><b>${rs(promisedTotal)} · ${groups.promised.length}</b></div>
+            <div class="row-between"><span>${t("promisedPending")}</span><b>${rs(sum(owed, "due"))} · ${owed.length}</b></div>
             <div class="row-between"><span>${t("assignedToYou")}</span><b>${groups.mine.length}</b></div>
         </a>
 
@@ -770,9 +1076,7 @@ function summaryText() {
     const tt = totals();
     const todays = state.collections.filter(c => c.date === now);
     const lastYearTotal = PAST[prevYear()] ? sum(PAST[prevYear()].donations) : 0;
-    const { groups } = followupGroups();
-    const promised = groups.promised.map(d => ({ name: d.name, amount: Number(followup(d).promised) || 0 }))
-        .sort((a, b) => b.amount - a.amount);
+    const promised = pledgesDue();
 
     const lines = [`*${t("sumTitle", { year: year(), date: fmtDate(now) })}*`, ""];
     if (todays.length) {
@@ -793,8 +1097,9 @@ function summaryText() {
         if (tt.unassignedOpening) lines.push(`• ${t("notHandedOver", { year: prevYear() })}: ${rs(tt.unassignedOpening)}`);
     }
     if (promised.length) {
-        lines.push("", `*${t("sumPromised")}: ${rs(sum(promised))}*`);
-        promised.slice(0, 10).forEach(p => lines.push(`• ${p.name}${p.amount ? " " + rs(p.amount) : ""}`));
+        lines.push("", `*${t("sumPromised")}: ${rs(sum(promised, "due"))}*`);
+        promised.slice(0, 10).forEach(p => lines.push(`• ${p.name} ` +
+            (p.given ? t("sumDue", { due: rs(p.due), pledge: rs(p.pledge) }) : rs(p.due))));
         if (promised.length > 10) lines.push(t("sumAndMore", { n: promised.length - 10 }));
     }
     lines.push("", t("jayMaa"));
@@ -807,6 +1112,7 @@ const FU_FILTERS = [
     ["todo", "fTodo"],
     ["calls", "fCalls"],
     ["promised", "fPromised"],
+    ["partial", "fPartial"],
     ["mine", "fMine"],
     ["fresh", "fFresh"],
     ["paid", "fPaid"],
@@ -818,9 +1124,10 @@ function viewFollowup() {
     return `
         <div class="view-head">
             <h1>${t("navFollowup")}</h1>
-            <p class="muted">${t("donorsPaidOf", { paid: paid.size, total: state.donors.length })}</p>
+            <p class="muted">${t("donorsPaidOf", { paid: groups.paid.length, total: state.donors.length })}</p>
         </div>
         ${state.donors.length ? `<button class="btn wa block queue-btn" data-act="queue-setup">${icon("whatsapp")} ${t("startReminders")}</button>` : ""}
+        ${state.donors.length && isNative ? `<button class="btn block queue-btn" data-act="sms-setup">${t("smsReminders")}</button>` : ""}
         ${searchBox("followup", t("searchName"))}
         <div class="chips">
             ${FU_FILTERS.filter(([key]) => key !== "calls" || groups.calls.length).map(([key, label]) => `
@@ -849,6 +1156,8 @@ function followupList() {
 
 function statusBadge(donor, paidAmount) {
     const fu = followup(donor);
+    const p = pledgeOf(donor);
+    if (p.partial) return `<span class="badge partial">${t("bPartial", { due: rs(p.due) })}</span>`;
     if (paidAmount) return `<span class="badge paid">${t("bPaid", { amount: rs(paidAmount) })}</span>`;
     if (fu.status === "promised") return `<span class="badge promised">${fu.promised ? t("bPromised", { amount: rs(fu.promised) }) : t("bPromisedPlain")}</span>`;
     if (fu.status === "later") {
@@ -869,9 +1178,17 @@ function donorCard(donor, paidAmount) {
     ].filter(Boolean).join(" · ");
     const upiBtn = hasUpi()
         ? `<button class="btn" data-act="upi-qr" data-id="${donor.id}">${t("upiQr")}</button>` : "";
+    const p = pledgeOf(donor);
+    const paidLabel = p.partial ? t("addPayment") : t("paidBtn");
+    const pledgeBar = p.pledge && p.given ? `
+        <div class="pledge">
+            <div class="row-between small"><span>${t("pledgeLine", { given: rs(p.given), pledge: rs(p.pledge) })}</span>
+                <b>${p.closed ? t("pledgeClosed", { given: rs(p.given) }) : p.due ? t("pledgeDue", { due: rs(p.due) }) : "✓"}</b></div>
+            <div class="bar"><span style="width:${Math.min(100, (p.given / p.pledge) * 100)}%"></span></div>
+        </div>` : "";
 
     let actions;
-    if (paidAmount) {
+    if (p.done) {
         actions = donor.phone
             ? `<a class="btn wa" href="${esc(waLink(donor.phone, thanksMessage(donor, paidAmount)))}" target="_blank" rel="noopener">${icon("whatsapp")} ${t("thank")}</a>`
             : "";
@@ -881,13 +1198,13 @@ function donorCard(donor, paidAmount) {
             <a class="btn" href="${telLink(donor.phone)}" data-act="contacted" data-lead="call" data-id="${donor.id}">${t("call")}</a>
             ${upiBtn}
             <button class="btn" data-act="fu-update" data-id="${donor.id}">${t("update")}</button>
-            <button class="btn primary" data-act="collect" data-id="${donor.id}">${t("paidBtn")}</button>`;
+            <button class="btn primary" data-act="collect" data-id="${donor.id}">${paidLabel}</button>`;
     } else {
         actions = `
             <button class="btn" data-act="edit-donor" data-id="${donor.id}">${t("addNumber")}</button>
             ${upiBtn}
             <button class="btn" data-act="fu-update" data-id="${donor.id}">${t("update")}</button>
-            <button class="btn primary" data-act="collect" data-id="${donor.id}">${t("paidBtn")}</button>`;
+            <button class="btn primary" data-act="collect" data-id="${donor.id}">${paidLabel}</button>`;
     }
 
     return `
@@ -899,8 +1216,9 @@ function donorCard(donor, paidAmount) {
                 </div>
                 ${statusBadge(donor, paidAmount)}
             </div>
+            ${pledgeBar}
             ${fu.note ? `<p class="dc-note">${esc(fu.note)}</p>` : ""}
-            ${paidAmount ? "" : leadLine(donor)}
+            ${p.done ? "" : leadLine(donor)}
             ${actions ? `<div class="dc-actions">${actions}</div>` : ""}
         </article>`;
 }
@@ -908,7 +1226,7 @@ function donorCard(donor, paidAmount) {
 // --- Who is on a donor: the last member who reminded / called / showed UPI / updated ---
 // Everyone sees it; it never stops anyone else from contacting the donor.
 
-const LEAD_TEXT = { remind: "leadRemind", call: "leadCall", upi: "leadUpi", update: "leadUpdate" };
+const LEAD_TEXT = { remind: "leadRemind", call: "leadCall", upi: "leadUpi", update: "leadUpdate", sms: "leadSms" };
 const millis = ts => (ts && ts.toMillis ? ts.toMillis() : 0);
 const isToday = ts => millis(ts) && new Date(millis(ts)).toDateString() === new Date().toDateString();
 const isLive = ts => millis(ts) && Date.now() - millis(ts) < 60 * 60 * 1000;
@@ -938,14 +1256,14 @@ function leadLine(donor) {
 function markLead(donorId, action) {
     const fu = followup(donorById(donorId) || {});
     const update = { leadBy: state.me.id, leadAction: action, leadAt: serverTimestamp() };
-    if (action === "remind" || action === "call") Object.assign(update, { contactedAt: today(), contactedBy: state.me.id });
+    if (action === "remind" || action === "call" || action === "sms") Object.assign(update, { contactedAt: today(), contactedBy: state.me.id });
     if (!fu.assignedTo) update.assignedTo = state.me.id;
     commit(setDoc(doc(db, "donors", donorId), { fu: { [year()]: update } }, { merge: true }));
 }
 
 // --- Reminder queue: one donor after another, each sent by hand from your own WhatsApp ---
 
-const QUEUE_LISTS = [["todo", "fTodo"], ["mine", "fMine"], ["fresh", "fFresh"], ["promised", "fPromised"]];
+const QUEUE_LISTS = [["todo", "fTodo"], ["mine", "fMine"], ["fresh", "fFresh"], ["promised", "fPromised"], ["partial", "fPartial"]];
 
 function queueDonors(list, skipToday) {
     const { groups } = followupGroups();
@@ -954,18 +1272,87 @@ function queueDonors(list, skipToday) {
     return byLastGift(donors);
 }
 
-function openQueueSetup(list = "todo", skipToday = true) {
+function openQueueSetup(list = "todo", skipToday = true, mode = "wa") {
     const option = ([key, label]) => `
         <label><input type="radio" name="list" value="${key}" ${key === list ? "checked" : ""}>
             ${t(label)} <span class="muted small">${queueDonors(key, skipToday).length}</span></label>`;
-    openSheet(t("queueTitle"), `
-        <form class="form" data-form="queue-start">
+    let smsInfo = "";
+    let startButton = `<button class="btn wa block">${icon("whatsapp")} ${t("queueStart")}</button>`;
+    if (mode === "sms") {
+        const donors = queueDonors(list, skipToday);
+        const parts = donors.reduce((total, d) => total + smsParts(smsReminderText(d)), 0);
+        smsInfo = `
+            <p class="preview small">${t("smsEstimate", { donors: donors.length, sms: parts })}<br>
+                ${t("smsUsedToday", { used: smsUsedToday(), limit: smsLimit() })}</p>
+            ${donors.length ? `<details><summary>${t("smsPreview")}</summary><pre class="sms-preview">${esc(smsReminderText(donors[0]))}</pre></details>` : ""}
+            <p class="hint">${t("smsKeepOpen")}</p>`;
+        startButton = `<button class="btn primary block">${t("smsStart", { n: donors.length })}</button>`;
+    }
+    openSheet(mode === "sms" ? t("smsTitle") : t("queueTitle"), `
+        <form class="form" data-form="queue-start" data-mode="${mode}">
             <span class="field-label">${t("queueWho")}</span>
             <div class="radio-col">${QUEUE_LISTS.map(option).join("")}</div>
             <label class="check-row"><input type="checkbox" name="skipToday" ${skipToday ? "checked" : ""}> ${t("queueSkipToday")}</label>
             <p class="hint">${t("queueOnlyPhones")}</p>
-            <button class="btn wa block">${icon("whatsapp")} ${t("queueStart")}</button>
+            ${smsInfo}
+            ${startButton}
         </form>`);
+}
+
+function renderSmsRun() {
+    const run = state.smsRun;
+    if (!run) return;
+    const current = donorById(run.ids[run.index]);
+    let status;
+    if (run.done) {
+        status = `
+            <div class="tick">✓</div>
+            <p>${t("smsDone", { sent: run.sent, failed: run.failed })}</p>
+            ${run.limitHit ? `<p class="lead-warn">${t("smsLimitHit", { limit: smsLimit() })}</p>` : ""}
+            ${run.permissionDenied ? `<p class="lead-warn">${t("smsNoPermission")}</p>` : ""}
+            <button class="btn block" data-act="close-sheet">${t("done")}</button>`;
+    } else {
+        status = `
+            <div class="bar"><span style="width:${(run.index / run.ids.length) * 100}%"></span></div>
+            <p>${t("smsSending", { n: run.index + 1, total: run.ids.length })}</p>
+            ${current ? `<h3>${esc(current.name)}</h3>` : ""}
+            <p class="muted">${t("smsProgress", { sent: run.sent, failed: run.failed })}</p>
+            <button class="btn block" data-act="sms-stop">${t("queueStop")}</button>
+            <p class="hint">${t("smsKeepOpen")}</p>`;
+    }
+    openSheet(t("smsTitle"), `<div class="queue done">${status}</div>`);
+}
+
+async function runSms() {
+    const run = state.smsRun;
+    renderSmsRun();
+    while (run.index < run.ids.length && !run.stopped) {
+        if (smsUsedToday() >= smsLimit()) {
+            run.limitHit = true;
+            break;
+        }
+        const donor = donorById(run.ids[run.index]);
+        if (donor && donor.phone) {
+            try {
+                await sendSms(donor.phone, smsReminderText(donor));
+                run.sent++;
+                markLead(donor.id, "sms");
+            } catch (e) {
+                run.failed++;
+                if (e && e.code === "PERMISSION_DENIED") {
+                    run.permissionDenied = true;
+                    break;
+                }
+            }
+        }
+        run.index++;
+        if (run.stopped) break;
+        renderSmsRun();
+        // A short gap between messages so the network does not treat them as spam
+        await new Promise(resolve => setTimeout(resolve, 4000));
+    }
+    run.done = true;
+    if (state.smsRun === run) renderSmsRun();
 }
 
 function renderQueue() {
@@ -1019,32 +1406,98 @@ function queueAdvance() {
 
 const msgKey = base => state.settings.msgLang === "en" ? base : base + "Or";
 
-function reminderMessage(donor) {
+// Values every reminder template can use; {paid}, {pledge} and {due} are there for custom messages
+function reminderVars(donor) {
     const last = lastGift(donor);
-    const fu = followup(donor);
-    return fillTemplate(state.settings[msgKey("waReminder")], {
+    const p = pledgeOf(donor);
+    return {
         name: donor.name,
         year: year(),
         last: last ? last.amount.toLocaleString("en-IN") : "",
         member: state.me.name || "",
-        paylink: payLink(donor.name, fu.promised),
-        upi: state.settings.upiId || ""
-    });
+        paylink: payLink(donor.name, p.partial ? p.due : p.pledge),
+        upi: payInfo().upiId,
+        paid: p.given ? inr(p.given) : "",
+        pledge: p.pledge ? inr(p.pledge) : "",
+        due: p.due ? inr(p.due) : ""
+    };
 }
 
-function thanksMessage(donor, amount, member, receiptNo) {
+function reminderMessage(donor) {
+    const vars = reminderVars(donor);
+    return withLines(fillTemplate(state.settings[msgKey("waReminder")], vars), reminderLines(donor, false), vars.paylink);
+}
+
+// given = donor's total including this payment; worked out from the receipt when not passed
+function thanksMessage(donor, amount, member, receiptNo, token, kind = "waThanks", given) {
+    const entry = receiptNo === undefined
+        ? state.collections.find(c => c.donorId === donor.id)
+        : state.collections.find(c => c.donorId === donor.id && receiptNo && c.receiptNo === receiptNo);
     if (receiptNo === undefined) {
-        const latest = state.collections.find(c => c.donorId === donor.id);
-        receiptNo = latest ? latest.receiptNo : "";
+        receiptNo = entry ? entry.receiptNo : "";
+        token = entry ? entry.receiptToken : "";
     }
-    return fillTemplate(state.settings[msgKey("waThanks")], {
+    if (given === undefined) given = entry ? givenUpTo(entry) : Number(amount);
+    let template = state.settings[msgKey(kind)] || "";
+    const link = receiptLink(token);
+    // Messages saved before receipt links existed still get the link
+    if (link && !template.includes("{receiptlink}")) template += `\n${t("receiptWord")}: {receiptlink}`;
+    const text = fillTemplate(template, {
         name: donor.name,
         year: year(),
         amount: Number(amount).toLocaleString("en-IN"),
         receipt: receiptLabel(receiptNo),
+        receiptlink: link,
         member: member || state.me.name || "",
-        upi: state.settings.upiId || ""
+        upi: payInfo().upiId
     });
+    return withLines(text, thanksLines(donor, amount, given, kind === "smsReceipt"), receiptLabel(receiptNo) || link);
+}
+
+// ---------- SMS from the member's own SIM (Android app only) ----------
+
+// How many SMS a message takes: plain English 160 letters, Odia (Unicode) 70
+function smsParts(text) {
+    const plain = /^[\x20-\x7E\n\r]*$/.test(text);
+    const single = plain ? 160 : 70;
+    const multi = plain ? 153 : 67;
+    return text.length <= single ? 1 : Math.ceil(text.length / multi);
+}
+
+function smsUsedToday() {
+    try {
+        const saved = JSON.parse(localStorage.getItem("kpSmsCount") || "{}");
+        return saved.date === today() ? saved.count : 0;
+    } catch (e) {
+        return 0;
+    }
+}
+
+function addSmsUsed(parts) {
+    try { localStorage.setItem("kpSmsCount", JSON.stringify({ date: today(), count: smsUsedToday() + parts })); } catch (e) { }
+}
+
+const smsLimit = () => Number(state.settings.smsDailyLimit) || 90;
+
+function sendSms(phone, message) {
+    const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 30000));
+    return Promise.race([Native.sms.send({ phone: "+" + waNumber(phone), message }), timeout])
+        .then(result => {
+            addSmsUsed((result && result.parts) || smsParts(message));
+            return result;
+        });
+}
+
+function smsReminderText(donor) {
+    const vars = reminderVars(donor);
+    return withLines(fillTemplate(state.settings[msgKey("smsReminder")], vars), reminderLines(donor, true), vars.paylink);
+}
+
+// Sends the receipt SMS automatically after a collection gets its number (Android app only)
+function sendReceiptSms(donor, amount, number, token, given) {
+    if (!isNative || state.settings.autoReceiptSms === false || !donor.phone || !number) return null;
+    const message = thanksMessage(donor, amount, state.me.name, number, token, "smsReceipt", given);
+    return sendSms(donor.phone, message);
 }
 
 // --- Entries ---
@@ -1127,11 +1580,13 @@ function viewMore() {
         </div>
         <div class="menu">
             ${menuItem("#members", t("mMembers"), t("mMembersSub", { n: state.members.length }))}
+            ${menuItem("#myupi", t("mMyUpi"), payInfo().key ? t("mMyUpiOn") : t("mMyUpiOff"))}
             ${menuItem("#settings", t("mSettings"), t("mSettingsSub", { year: esc(year()) }))}
             ${menuItem("#export", t("mExport"), t("mExportSub"))}
             ${menuItem("", t("mImport"), t("mImportSub", { years: pastYears }), "import-past")}
         </div>
         <div class="menu">
+            ${menuItem("guide.html", t("mGuide"), t("mGuideSub"))}
             ${menuItem("", t("signOut"), esc(state.user.email), "signout")}
         </div>`;
 }
@@ -1333,6 +1788,19 @@ function viewSettings() {
                 <label>${t("qrImage")}<input name="qrFile" type="file" accept="image/*"></label>
                 <p class="hint">${t("qrUploadHint")}</p>
                 <div class="qr-preview" id="qr-preview">${qrPreview()}</div>
+                <label>${t("upiOwner")}
+                    <select name="upiOwner"><option value="">${t("nobody")}</option>${memberOptions(s.upiOwner)}</select>
+                </label>
+                <p class="hint">${t("upiOwnerHint")}</p>
+            </div>
+
+            <div class="panel form">
+                <h2>${t("nudgeSection")}</h2>
+                <p class="hint">${t("nudgeHint")}</p>
+                <label class="check-row"><input type="checkbox" name="nudgeCrowd" ${s.nudgeCrowd !== false ? "checked" : ""}> ${t("nudgeCrowd")}</label>
+                <label class="check-row"><input type="checkbox" name="nudgeCommon" ${s.nudgeCommon !== false ? "checked" : ""}> ${t("nudgeCommon")}</label>
+                <label class="check-row"><input type="checkbox" name="nudgeTier" ${s.nudgeTier !== false ? "checked" : ""}> ${t("nudgeTier")}</label>
+                <label>${t("tiersLabel")}<textarea name="tiers" rows="4">${esc(s.tiers)}</textarea></label>
             </div>
 
             <div class="panel form">
@@ -1357,12 +1825,50 @@ function viewSettings() {
                 <button type="button" class="btn small" data-act="reset-messages">${t("resetMessages")}</button>
             </div>
 
+            <div class="panel form">
+                <h2>${t("smsSection")}</h2>
+                <p class="hint">${t("smsSectionHint")}</p>
+                <label class="check-row"><input type="checkbox" name="autoReceiptSms" ${s.autoReceiptSms !== false ? "checked" : ""}> ${t("autoReceiptSms")}</label>
+                <label>${t("smsDailyLimit")}<input name="smsDailyLimit" type="number" inputmode="numeric" min="1" value="${esc(s.smsDailyLimit)}"></label>
+                <details>
+                    <summary>${t("odia")}</summary>
+                    <label>${t("smsReminderMsg")}<textarea name="smsReminderOr" rows="6">${esc(s.smsReminderOr)}</textarea></label>
+                    <label>${t("smsReceiptMsg")}<textarea name="smsReceiptOr" rows="5">${esc(s.smsReceiptOr)}</textarea></label>
+                </details>
+                <details>
+                    <summary>${t("english")}</summary>
+                    <label>${t("smsReminderMsg")}<textarea name="smsReminder" rows="6">${esc(s.smsReminder)}</textarea></label>
+                    <label>${t("smsReceiptMsg")}<textarea name="smsReceipt" rows="5">${esc(s.smsReceipt)}</textarea></label>
+                </details>
+            </div>
+
             <button class="btn primary block">${t("saveSettings")}</button>
         </form>`;
 }
 
+// Each member can hand out their own UPI / QR instead of the main committee one
+function viewMyUpi() {
+    const me = state.me;
+    const own = Boolean(payInfo().key);
+    return `
+        <div class="view-head">
+            <a href="#more" class="back">${t("back")}</a>
+            <h1>${t("myUpiTitle")}</h1>
+            <p class="muted">${t("myUpiSub")}</p>
+        </div>
+        <form class="panel form" data-form="myupi">
+            <label>${t("upiId")}<input name="upiId" autocapitalize="none" placeholder="9876543210@ybl" value="${esc(me.upiId || "")}"></label>
+            <label>${t("myUpiName")}<input name="upiName" value="${esc(me.upiName || me.name || "")}"></label>
+            <label>${t("qrImage")}<input name="qrFile" type="file" accept="image/*"></label>
+            <div class="qr-preview" id="qr-preview">${qrPreview()}</div>
+            <button class="btn primary block">${t("save")}</button>
+            ${own ? `<button type="button" class="btn danger block" data-act="remove-my-upi">${t("myUpiRemove")}</button>` : ""}
+        </form>`;
+}
+
 function qrPreview() {
-    const image = state.pendingQr !== undefined ? state.pendingQr : state.publicPay.qrImage;
+    const saved = currentView() === "myupi" ? state.myPay.qrImage : state.publicPay.qrImage;
+    const image = state.pendingQr !== undefined ? state.pendingQr : saved;
     return image ? `
         <img src="${esc(image)}" alt="UPI QR">
         <button type="button" class="btn small danger" data-act="remove-qr">${t("removeQr")}</button>` : "";
@@ -1513,6 +2019,10 @@ function closeSheet(fromBackButton) {
     sheetOpen = false;
     resetPhoto();
     state.queue = null;
+    if (state.smsRun) {
+        state.smsRun.stopped = true;
+        state.smsRun = null;
+    }
     pushAfterBack = false;
     $("#sheet-root").innerHTML = "";
     document.body.classList.remove("no-scroll");
@@ -1545,6 +2055,8 @@ function openCollectionSheet({ entry, donorId } = {}) {
     const donor = donorById(entry ? entry.donorId : donorId);
     const fu = donor ? followup(donor) : {};
     const receipt = entry && entry.receiptNo ? receiptLabel(entry.receiptNo) : "";
+    const p = donor ? pledgeOf(donor) : null;
+    const upiTo = entry ? entry.upiTo || BANK : state.me.hasOwnUpi ? state.me.id : BANK;
     openSheet(entry ? `${t("editCollection")}${receipt ? " · " + receipt : ""}` : t("newCollection"), `
         <form class="form" data-form="collection" data-id="${entry ? entry.id : ""}">
             <label>${t("donorName")}
@@ -1553,19 +2065,28 @@ function openCollectionSheet({ entry, donorId } = {}) {
             <datalist id="donor-names">${state.donors.map(d => `<option value="${esc(d.name)}">`).join("")}</datalist>
             <label>${t("phoneOptional")}<input name="phone" type="tel" inputmode="tel" value="${esc(donor ? donor.phone : "")}"></label>
             <label>${t("amount")}
-                <input name="amount" type="number" inputmode="numeric" min="1" required value="${esc(entry ? entry.amount : fu.promised || "")}">
+                <input name="amount" type="number" inputmode="numeric" min="1" required value="${esc(entry ? entry.amount : (p && p.partial ? p.due : fu.promised) || "")}">
             </label>
+            ${!entry && p && p.partial ? `<p class="hint">${t("pledgeHint", { pledge: rs(p.pledge), given: rs(p.given), due: rs(p.due) })}</p>` : ""}
             <div class="radio-row">
                 <label><input type="radio" name="mode" value="cash" ${!entry || entry.mode !== "upi" ? "checked" : ""}> ${t("cash")}</label>
                 <label><input type="radio" name="mode" value="upi" ${entry && entry.mode === "upi" ? "checked" : ""}> ${t("upiOnline")}</label>
             </div>
+            ${ownUpiMembers().length ? `
+            <label class="upi-only">${t("upiTo")}
+                <select name="upiTo">
+                    <option value="${BANK}">${esc(memberName(BANK))}</option>
+                    ${ownUpiMembers().map(m => `<option value="${esc(m.id)}" ${m.id === upiTo ? "selected" : ""}>${esc(t("ownUpi", { name: m.name }))}</option>`).join("")}
+                </select>
+            </label>` : ""}
             <label>${t("receivedBy")}<select name="by">${memberOptions(entry ? entry.collectedBy : state.me.id)}</select></label>
             <label>${t("date")}<input name="date" type="date" required value="${esc(entry ? entry.date : today())}"></label>
             <label>${t("note")}<input name="note" value="${esc(entry ? entry.note : "")}" placeholder="${t("optional")}"></label>
             ${photoField("photoCollection")}
             <button class="btn primary block">${entry ? t("saveChanges") : t("saveCollection")}</button>
+            ${entry && entry.receiptToken ? `<a class="small" href="${esc(receiptLink(entry.receiptToken))}" target="_blank" rel="noopener">${t("viewReceipt")}</a>` : ""}
             ${entry && donor && donor.phone && !entry.deleted ? `
-                <a class="btn wa block" href="${esc(waLink(donor.phone, thanksMessage(donor, entry.amount, memberName(entry.collectedBy), entry.receiptNo)))}"
+                <a class="btn wa block" href="${esc(waLink(donor.phone, thanksMessage(donor, entry.amount, memberName(entry.collectedBy), entry.receiptNo, entry.receiptToken)))}"
                     target="_blank" rel="noopener">${icon("whatsapp")} ${t("sendReceipt")}</a>` : ""}
             ${entry && !entry.deleted ? deleteButton("collections", entry.id) : ""}
         </form>`);
@@ -1617,23 +2138,31 @@ function openMoveSheet(entry) {
         </form>`);
 }
 
-function openFollowupSheet(donorId) {
+function openFollowupSheet(donorId, afterCall = false) {
     const donor = donorById(donorId);
     if (!donor) return;
     const fu = followup(donor);
-    const status = fu.status || "pending";
+    const p = pledgeOf(donor);
+    const status = afterCall ? "" : fu.status || "pending";
     const option = (value, label) =>
         `<label><input type="radio" name="status" value="${value}" ${status === value ? "checked" : ""}> ${t(label)}</label>`;
-    openSheet(donor.name, `
+    openSheet(afterCall ? t("callHow", { name: donor.name }) : donor.name, `
         <form class="form" data-form="followup" data-id="${donor.id}">
+            ${afterCall ? `<button type="button" class="btn primary block" data-act="collect" data-id="${donor.id}">${t("paidNow")}</button>` : ""}
             <div class="radio-col">
-                ${option("pending", "sNotDecided")}
+                ${afterCall ? option("noanswer", "sNoAnswer") : option("pending", "sNotDecided")}
                 ${option("promised", "sPromised")}
                 ${option("later", "sLater")}
                 ${option("declined", "sDeclined")}
             </div>
             <label>${t("promisedAmount")}<input name="promised" type="number" inputmode="numeric" value="${esc(fu.promised || "")}"></label>
-            <label>${t("callOn")}<input name="callOn" type="date" value="${esc(fu.callOn || "")}"></label>
+            ${p.given && p.pledge > p.given ? `
+                <p class="hint">${t("pledgeHint", { pledge: rs(p.pledge), given: rs(p.given), due: rs(p.pledge - p.given) })}</p>
+                <label class="check-row"><input type="checkbox" name="closed" ${p.closed ? "checked" : ""}> ${t("closePledge", { given: rs(p.given) })}</label>` : ""}
+            <div class="row-2">
+                <label>${t("callOn")}<input name="callOn" type="date" value="${esc(fu.callOn || "")}"></label>
+                <label>${t("callTime")}<input name="callTime" type="time" value="${esc(fu.callTime || "")}"></label>
+            </div>
             <label>${t("whoFollows")}
                 <select name="assignedTo"><option value="">${t("nobody")}</option>${memberOptions(fu.assignedTo)}</select>
             </label>
@@ -1646,13 +2175,15 @@ function openUpiSheet(donorId, amount) {
     const donor = donorById(donorId);
     if (!donor) return;
     if (!hasUpi()) return toast(t("noUpi"));
-    const fu = followup(donor);
-    const value = amount !== undefined ? amount : (fu.promised || (lastGift(donor) || {}).amount || "");
+    const p = pledgeOf(donor);
+    const value = amount !== undefined ? amount : ((p.partial ? p.due : p.pledge) || (lastGift(donor) || {}).amount || "");
     const link = payLink(donor.name, value);
-    const image = state.publicPay.qrImage;
+    const pay = payInfo();
+    const image = pay.qrImage;
     openSheet(t("upiTitle"), `
         <div class="upi">
             <p class="upi-for"><b>${esc(donor.name)}</b></p>
+            ${pay.upiName ? `<p class="hint">${t("payingTo", { name: esc(pay.upiName) })}</p>` : ""}
             ${image ? `
                 <div class="qr qr-image"><img src="${esc(image)}" alt="UPI QR"></div>
                 <p class="hint">${t("qrDonorAmount")}</p>` : `
@@ -1660,8 +2191,8 @@ function openUpiSheet(donorId, amount) {
                     <label>${t("amount")}<input name="amount" type="number" inputmode="numeric" value="${esc(value)}"></label>
                 </form>
                 <div class="qr">${qrSvg(upiString(value, `Kartikeswar Puja ${year()} - ${donor.name}`))}</div>`}
-            ${state.settings.upiId ? `
-                <p class="upi-id">${esc(state.settings.upiId)}</p>
+            ${pay.upiId ? `
+                <p class="upi-id">${esc(pay.upiId)}</p>
                 <button class="btn block" data-act="copy-upi">${t("copyUpi")}</button>` : ""}
             ${donor.phone ? `<a class="btn wa block" href="${esc(waLink(donor.phone, t("payLinkMsg", { name: donor.name, year: year(), paylink: link })))}"
                 target="_blank" rel="noopener">${icon("whatsapp")} ${t("sharePayLink")}</a>` : ""}
@@ -1766,17 +2297,27 @@ function openPasteNumbersSheet(text = "", preview = null) {
         </form>`);
 }
 
-function openSavedSheet(donor, amount, collectorEmail, receiptNo) {
+function openSavedSheet(donor, amount, collectorEmail, receiptNo, token, given) {
+    const smsSending = Boolean(receiptNo && isNative && state.settings.autoReceiptSms !== false && donor.phone);
     openSheet(t("saved"), `
         <div class="done">
             <div class="tick">✓</div>
             <h2>${rs(amount)}</h2>
             <p class="muted">${t("fromDonor", { name: esc(donor.name) })}</p>
             ${receiptNo ? `<p class="receipt">${t("receiptNo", { no: receiptLabel(receiptNo) })}</p>` : `<p class="hint">${t("receiptLater")}</p>`}
-            ${donor.phone ? `<a class="btn wa block" href="${esc(waLink(donor.phone, thanksMessage(donor, amount, memberName(collectorEmail), receiptNo || "")))}"
+            ${token ? `<a class="small" href="${esc(receiptLink(token))}" target="_blank" rel="noopener">${t("viewReceipt")}</a>` : ""}
+            ${smsSending ? `<p class="hint" id="receipt-sms">${t("receiptSmsSending")}</p>` : ""}
+            ${donor.phone ? `<a class="btn wa block" href="${esc(waLink(donor.phone, thanksMessage(donor, amount, memberName(collectorEmail), receiptNo || "", token, "waThanks", given)))}"
                 target="_blank" rel="noopener" data-act="close-sheet">${icon("whatsapp")} ${t("sendThanks")}</a>` : ""}
             <button class="btn block" data-act="close-sheet">${t("done")}</button>
         </div>`);
+    if (smsSending) {
+        const status = ok => {
+            const el = $("#receipt-sms");
+            if (el) el.textContent = ok ? "✓ " + t("receiptSmsSent") : t("receiptSmsFailed");
+        };
+        sendReceiptSms(donor, amount, receiptNo, token, given).then(() => status(true), () => status(false));
+    }
 }
 
 // ---------- Saving ----------
@@ -1810,12 +2351,15 @@ const FORMS = {
             donorName: donor.name,
             amount,
             mode: f.mode || "cash",
+            upiTo: f.mode === "upi" ? f.upiTo || BANK : "",
             collectedBy: f.by,
             date: f.date,
             note: f.note.trim()
         };
 
         if (existingId) {
+            const old = state.collectionsAll.find(c => c.id === existingId);
+            if (old && old.receiptToken) saveReceiptPage(old.receiptToken, { ...data, id: existingId, createdAt: old.createdAt }, old.receiptNo);
             Object.assign(data, savePhoto("collections", existingId));
             batch.set(doc(db, yearPath("collections"), existingId), { ...data, ...stamp(false) }, { merge: true });
             commit(batch.commit());
@@ -1825,16 +2369,17 @@ const FORMS = {
 
         commit(batch.commit());
         const ref = doc(collection(db, yearPath("collections")));
+        const given = givenUpTo({ ...data, id: ref.id });
         const entry = { ...data, ...savePhoto("collections", ref.id), ...stamp(true) };
         form.querySelector("button:not([type])").disabled = true;
-        let receiptNo = null;
+        let receipt = null;
         if (navigator.onLine) {
-            try { receiptNo = await saveWithReceipt(ref, entry); } catch (e) { receiptNo = null; }
+            try { receipt = await saveWithReceipt(ref, entry); } catch (e) { receipt = null; }
         }
         // Offline or slow: save without a number; it is numbered automatically once synced.
         // Same document id, so a late transaction and this write never make two entries.
-        if (!receiptNo) commit(setDoc(ref, entry, { merge: true }));
-        openSavedSheet(donor, amount, f.by, receiptNo);
+        if (!receipt) commit(setDoc(ref, entry, { merge: true }));
+        openSavedSheet(donor, amount, f.by, receipt && receipt.number, receipt && receipt.token, given);
     },
 
     expense(form) {
@@ -1879,10 +2424,19 @@ const FORMS = {
 
     followup(form) {
         const f = formValues(form);
+        let status = f.status || followup(donorById(form.dataset.id) || {}).status || "pending";
+        let callOn = f.callOn || "";
+        if (status === "noanswer") {
+            // Didn't pick up: try again tomorrow unless a date was chosen
+            status = "later";
+            callOn = callOn || addDays(today(), 1);
+        }
         const update = {
-            status: f.status,
+            status,
             promised: Number(f.promised) || 0,
-            callOn: f.callOn || "",
+            closed: Boolean(form.elements.closed && form.elements.closed.checked),
+            callOn,
+            callTime: f.callTime || "",
             assignedTo: f.assignedTo,
             note: f.note.trim(),
             updatedBy: state.me.id,
@@ -1957,6 +2511,10 @@ const FORMS = {
         const skipToday = form.elements.skipToday.checked;
         const ids = queueDonors(list, skipToday).map(d => d.id);
         if (!ids.length) return toast(t("queueEmpty"));
+        if (form.dataset.mode === "sms") {
+            state.smsRun = { ids, index: 0, sent: 0, failed: 0, stopped: false, done: false };
+            return runSms();
+        }
         state.queue = { ids, index: 0, sent: 0, skipped: 0, sentCurrent: false };
         renderQueue();
     },
@@ -2001,11 +2559,22 @@ const FORMS = {
             openingBalance: Number(f.openingBalance) || 0,
             upiId,
             upiName,
+            upiOwner: f.upiOwner || "",
+            nudgeCrowd: form.elements.nudgeCrowd.checked,
+            nudgeCommon: form.elements.nudgeCommon.checked,
+            nudgeTier: form.elements.nudgeTier.checked,
+            tiers: f.tiers,
             msgLang: f.msgLang,
             waReminder: f.waReminder,
             waThanks: f.waThanks,
             waReminderOr: f.waReminderOr,
             waThanksOr: f.waThanksOr,
+            autoReceiptSms: form.elements.autoReceiptSms.checked,
+            smsDailyLimit: Number(f.smsDailyLimit) || 90,
+            smsReminder: f.smsReminder,
+            smsReceipt: f.smsReceipt,
+            smsReminderOr: f.smsReminderOr,
+            smsReceiptOr: f.smsReceiptOr,
             ...stamp(false)
         }, { merge: true });
         commit(batch.commit());
@@ -2017,6 +2586,26 @@ const FORMS = {
         state.pendingQr = undefined;
         formDirty = false;
         toast(t("settingsSaved"));
+    },
+
+    // Own UPI: the member doc says whether it is on; the QR goes in a public doc for the pay page
+    myupi(form) {
+        const f = formValues(form);
+        const upiId = f.upiId.trim();
+        const upiName = f.upiName.trim() || state.me.name || "";
+        const qrImage = state.pendingQr !== undefined ? state.pendingQr : state.myPay.qrImage || "";
+        if (!upiId && !qrImage) return ACTIONS["remove-my-upi"]();
+        const payKey = state.me.payKey || newToken().slice(0, 12);
+        commit(setDoc(doc(db, "members", state.me.id), { upiId, upiName, payKey, hasOwnUpi: true, ...stamp(false) }, { merge: true }));
+        commit(setDoc(doc(db, "public", "m-" + payKey), { upiId, upiName, qrImage }));
+        // Show it straight away, before the database answers
+        Object.assign(state.me, { upiId, upiName, payKey, hasOwnUpi: true });
+        watchMyPay(payKey);
+        state.myPay = { upiId, upiName, qrImage };
+        state.pendingQr = undefined;
+        formDirty = false;
+        toast(t("myUpiSaved"));
+        render();
     }
 };
 
@@ -2056,7 +2645,19 @@ const ACTIONS = {
         });
     },
 
-    "contacted": (el, id) => markLead(id, el.dataset.lead || "remind"),
+    "contacted": (el, id) => {
+        markLead(id, el.dataset.lead || "remind");
+        // After a call, ask how it went when the member comes back to the app
+        if (el.dataset.lead === "call") {
+            try { localStorage.setItem("kpPendingCall", JSON.stringify({ id, at: Date.now() })); } catch (e) { }
+        }
+    },
+
+    "sms-setup": () => openQueueSetup("todo", true, "sms"),
+
+    "sms-stop": () => {
+        if (state.smsRun) state.smsRun.stopped = true;
+    },
 
     "queue-setup": () => openQueueSetup(),
 
@@ -2112,6 +2713,10 @@ const ACTIONS = {
 
     "delete-entry": (el, id) => {
         if (!confirm(t("confirmDelete"))) return;
+        const entry = el.dataset.kind === "collections" && state.collectionsAll.find(c => c.id === id);
+        if (entry && entry.receiptToken) {
+            commit(setDoc(receiptRef(entry.receiptToken), { status: "cancelled", updatedAt: serverTimestamp() }, { merge: true }));
+        }
         commit(setDoc(doc(db, yearPath(el.dataset.kind), id),
             { deleted: true, deletedBy: state.me.id, deletedAt: serverTimestamp() }, { merge: true }));
         closeSheet();
@@ -2157,9 +2762,23 @@ const ACTIONS = {
         $("#qr-preview").innerHTML = "";
     },
 
+    // Keep payKey so old pay links still open (they fall back to the main committee QR)
+    "remove-my-upi": () => {
+        const payKey = state.me.payKey;
+        commit(setDoc(doc(db, "members", state.me.id), { upiId: "", hasOwnUpi: false, ...stamp(false) }, { merge: true }));
+        if (payKey) commit(setDoc(doc(db, "public", "m-" + payKey), { upiId: "", upiName: "", qrImage: "" }));
+        Object.assign(state.me, { upiId: "", hasOwnUpi: false });
+        state.myPay = {};
+        state.pendingQr = undefined;
+        formDirty = false;
+        toast(t("myUpiRemoved"));
+        render();
+    },
+
     "copy-upi": () => {
-        const copy = navigator.clipboard ? navigator.clipboard.writeText(state.settings.upiId) : Promise.reject();
-        copy.then(() => toast(t("copied")), () => toast(state.settings.upiId));
+        const upiId = payInfo().upiId;
+        const copy = navigator.clipboard ? navigator.clipboard.writeText(upiId) : Promise.reject();
+        copy.then(() => toast(t("copied")), () => toast(upiId));
     },
 
     "fu-filter": el => {
@@ -2210,6 +2829,7 @@ const ACTIONS = {
     "export": el => exportData(el.dataset.kind),
 
     "google-login": () => {
+        if (isNative) return toast(t("googleNative"));
         signInWithPopup(auth, new GoogleAuthProvider()).catch(err => {
             if (err.code === "auth/popup-closed-by-user" || err.code === "auth/cancelled-popup-request") return;
             toast(t("googleFailed"));
@@ -2227,7 +2847,7 @@ function exportData(kind) {
         download(`collections-${y}.csv`, toCsv([
             ["Receipt", "Date", "Donor", "Amount", "Mode", "Received by", "Status", "Photo", "Note"],
             ...state.collectionsAll.slice().sort((a, b) => (a.receiptNo || 1e9) - (b.receiptNo || 1e9)).map(c => [
-                receiptLabel(c.receiptNo), c.date, c.donorName, c.amount, c.mode === "upi" ? "UPI" : "Cash",
+                receiptLabel(c.receiptNo), c.date, c.donorName, c.amount, c.mode === "upi" ? `UPI (${memberName(c.upiTo || BANK)})` : "Cash",
                 memberName(c.collectedBy), c.deleted ? "Cancelled" : "", c.hasPhoto ? "Yes" : "", c.note
             ])
         ]));
@@ -2254,10 +2874,10 @@ function exportData(kind) {
         const years = [...new Set(state.donors.flatMap(d => Object.keys(d.history || {})))].sort();
         const paid = paidMap();
         download("donors.csv", toCsv([
-            ["Name", "Phone", ...years, y, "Status", "Promised", "Note"],
+            ["Name", "Phone", ...years, y, "Status", "Promised", "Due", "Note"],
             ...state.donors.slice().sort((a, b) => a.name.localeCompare(b.name)).map(d => [
                 d.name, d.phone, ...years.map(yr => (d.history || {})[yr] || ""), paid.get(d.id) || "",
-                followup(d).status || "", followup(d).promised || "", d.note
+                followup(d).status || "", followup(d).promised || "", pledgeOf(d, paid).due || "", d.note
             ])
         ]));
     } else if (kind === "website") {
@@ -2336,7 +2956,7 @@ document.addEventListener("change", e => {
         if (vendor) form.elements.category.value = vendor.category || "";
     }
     if (form && form.dataset.form === "queue-start") {
-        openQueueSetup(formValues(form).list, form.elements.skipToday.checked);
+        openQueueSetup(formValues(form).list, form.elements.skipToday.checked, form.dataset.mode);
         return;
     }
     // Changing the amount on the UPI sheet redraws the QR code
@@ -2372,13 +2992,30 @@ window.addEventListener("online", () => {
 window.addEventListener("offline", scheduleRender);
 
 document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "visible" && state.queue && state.queue.sentCurrent) {
-        setTimeout(queueAdvance, 300);
-    }
+    if (document.visibilityState !== "visible") return;
+    if (state.queue && state.queue.sentCurrent) setTimeout(queueAdvance, 300);
+    setTimeout(checkPendingCall, 400);
 });
+
+function checkPendingCall() {
+    let pending = null;
+    try { pending = JSON.parse(localStorage.getItem("kpPendingCall") || "null"); } catch (e) { }
+    if (!pending || sheetOpen || state.memberStatus !== "ok" || !donorById(pending.id)) return;
+    const away = Date.now() - pending.at;
+    if (away < 4000) return; // back too quickly: the call probably did not start yet
+    try { localStorage.removeItem("kpPendingCall"); } catch (e) { }
+    if (away < 3 * 60 * 60 * 1000) openFollowupSheet(pending.id, true);
+}
 
 if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => { });
+}
+
+if (isNative) {
+    Native.notifications.addListener("localNotificationActionPerformed", event => {
+        const hash = event && event.notification && event.notification.extra && event.notification.extra.hash;
+        if (hash) location.hash = hash;
+    }).catch(() => { });
 }
 
 // ---------- Start ----------

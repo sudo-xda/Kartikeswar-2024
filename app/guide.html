@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Committee App Guide</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#7b1e22">
+    <link rel="icon" href="icon-192.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&family=Noto+Sans+Oriya:wght@400;600&family=Yeseva+One&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #fbf5ec;
+            --surface: #fff;
+            --ink: #2b1b17;
+            --muted: #7d6a60;
+            --line: #ecdfcc;
+            --maroon: #7b1e22;
+            --gold: #c9962f;
+            --gold-soft: #f6e7c4;
+            --green: #1e7a3c;
+            --wa: #1fa855;
+            --radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            scroll-padding-top: 70px;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Mukta', 'Noto Sans Oriya', 'Segoe UI', Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            line-height: 1.6;
+            font-size: 17px;
+        }
+
+        .top {
+            position: sticky;
+            top: 0;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 16px;
+            background: var(--maroon);
+            color: #fff;
+        }
+
+        .top b {
+            font-family: 'Yeseva One', Georgia, serif;
+            font-weight: 400;
+            font-size: 1.15rem;
+        }
+
+        .top a {
+            color: #fff;
+            font-weight: 600;
+            text-decoration: none;
+            white-space: nowrap;
+        }
+
+        header {
+            padding: 28px 16px 8px;
+            text-align: center;
+        }
+
+        .eyebrow {
+            margin: 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--gold);
+        }
+
+        h1,
+        h2 {
+            font-family: 'Yeseva One', Georgia, serif;
+            font-weight: 400;
+            color: var(--maroon);
+            line-height: 1.25;
+        }
+
+        h1 {
+            margin: 6px 0 4px;
+            font-size: 2rem;
+        }
+
+        h2 {
+            margin: 0 0 2px;
+            font-size: 1.45rem;
+        }
+
+        h3 {
+            margin: 18px 0 4px;
+            font-size: 1.05rem;
+        }
+
+        .or {
+            display: block;
+            margin: 0 0 10px;
+            color: var(--muted);
+            font-size: 0.95rem;
+        }
+
+        main {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 0 16px 48px;
+        }
+
+        section {
+            background: var(--surface);
+            border-radius: var(--radius);
+            box-shadow: 0 1px 3px rgba(60, 30, 20, 0.08);
+            padding: 20px 18px;
+            margin: 14px 0;
+        }
+
+        .toc ol {
+            margin: 6px 0 0;
+            padding-left: 22px;
+            columns: 2 220px;
+            column-gap: 24px;
+        }
+
+        .toc li {
+            break-inside: avoid;
+        }
+
+        .toc a {
+            color: var(--maroon);
+        }
+
+        ol.steps,
+        ul {
+            padding-left: 22px;
+            margin: 6px 0;
+        }
+
+        ol.steps li,
+        ul li {
+            margin: 4px 0;
+        }
+
+        p {
+            margin: 6px 0;
+        }
+
+        /* Looks like the app's buttons, so people can spot them */
+        .b {
+            display: inline-block;
+            padding: 0 10px;
+            border-radius: 8px;
+            border: 1px solid var(--line);
+            background: #fff;
+            font-weight: 600;
+            font-size: 0.92em;
+            white-space: nowrap;
+        }
+
+        .b.p {
+            background: var(--maroon);
+            border-color: var(--maroon);
+            color: #fff;
+        }
+
+        .b.wa {
+            background: var(--wa);
+            border-color: var(--wa);
+            color: #fff;
+        }
+
+        .b.plus {
+            background: #e8862a;
+            border-color: #e8862a;
+            color: #fff;
+            border-radius: 999px;
+        }
+
+        .tip,
+        .warn {
+            margin: 12px 0 4px;
+            padding: 10px 14px;
+            border-radius: 12px;
+            background: var(--gold-soft);
+        }
+
+        .warn {
+            background: #fbe3e1;
+        }
+
+        .tip b:first-child,
+        .warn b:first-child {
+            margin-right: 4px;
+        }
+
+        .msg {
+            margin: 10px 0;
+            padding: 10px 14px;
+            border-radius: 12px 12px 12px 4px;
+            background: #e7f7dc;
+            font-size: 0.93rem;
+            white-space: pre-line;
+        }
+
+        .bar {
+            height: 8px;
+            border-radius: 4px;
+            background: var(--line);
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .bar span {
+            display: block;
+            height: 100%;
+            width: 66%;
+            background: linear-gradient(90deg, var(--gold), #e8862a);
+        }
+
+        .card {
+            max-width: 340px;
+            margin: 12px 0;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-size: 0.9rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 0.95rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            vertical-align: top;
+            padding: 7px 8px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        th {
+            color: var(--muted);
+            font-weight: 600;
+        }
+
+        details {
+            border-bottom: 1px solid var(--line);
+            padding: 8px 0;
+        }
+
+        summary {
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        footer {
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.9rem;
+            padding: 0 16px 32px;
+        }
+
+        footer a {
+            color: var(--maroon);
+        }
+
+        @media print {
+            .top {
+                display: none;
+            }
+
+            section {
+                box-shadow: none;
+                border: 1px solid var(--line);
+                break-inside: avoid-page;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top">
+        <b>Kartikeswar</b>
+        <a href="./">← Back to app</a>
+    </div>
+
+    <header>
+        <p class="eyebrow">ଜୟ ମା ସିଦ୍ଧମଙ୍ଗଳା · Jay Maa Siddha Mangala</p>
+        <h1>Committee App Guide</h1>
+        <p class="or">କମିଟି ଆପ୍ ବ୍ୟବହାର ନିର୍ଦ୍ଦେଶିକା · For Kartikeswar Puja Committee members</p>
+    </header>
+
+    <main>
+        <section class="toc">
+            <h2>Contents</h2>
+            <ol>
+                <li><a href="#start">Getting started</a></li>
+                <li><a href="#home">The Home screen</a></li>
+                <li><a href="#collect">Adding a collection</a></li>
+                <li><a href="#parts">Part payments</a></li>
+                <li><a href="#followup">Following up with donors</a></li>
+                <li><a href="#sms">SMS reminders (Android app)</a></li>
+                <li><a href="#upi">UPI, QR and pay links</a></li>
+                <li><a href="#myupi">Your own UPI / QR</a></li>
+                <li><a href="#expense">Expenses and vendors</a></li>
+                <li><a href="#cash">Cash in hand and handovers</a></li>
+                <li><a href="#tasks">Puja checklist</a></li>
+                <li><a href="#alarms">Alarms and home-screen widget</a></li>
+                <li><a href="#mistakes">Fixing mistakes</a></li>
+                <li><a href="#settings">Settings (for the committee)</a></li>
+                <li><a href="#faq">Questions</a></li>
+            </ol>
+        </section>
+
+        <section id="start">
+            <h2>1. Getting started</h2>
+            <span class="or">ଆରମ୍ଭ</span>
+            <h3>Install the app</h3>
+            <ul>
+                <li><b>Android app (best):</b> open the <b>Kartikeswar.apk</b> file shared in the WhatsApp group, tap
+                    <b>Install</b> and, if asked, allow "Install unknown apps" once. When the app asks, allow
+                    <b>SMS</b> and <b>Notifications</b>. These are needed for SMS reminders and alarms.</li>
+                <li><b>Any phone (browser):</b> open the app link in Chrome, then ⋮ menu → <b>Add to Home screen</b>.
+                    On iPhone use Safari → Share → <b>Add to Home Screen</b>.</li>
+            </ul>
+            <h3>Sign in</h3>
+            <ol class="steps">
+                <li>Tap <span class="b">Use ID &amp; password instead</span>.</li>
+                <li>Type the ID and password the committee gave you (for example ID <code>kuna</code>).</li>
+                <li>In a browser you can also use <b>Sign in with Google</b> if your Gmail was added as a member.
+                    In the Android app, use the ID &amp; password.</li>
+            </ol>
+            <h3>Language</h3>
+            <p>Tap <b>More</b> → <b>English / ଓଡ଼ିଆ</b> at the top to switch the app's language. This only changes your phone.</p>
+            <div class="tip"><b>Good to know:</b> the app works without internet. Entries are saved on your phone and go up
+                by themselves when the network comes back.</div>
+        </section>
+
+        <section id="home">
+            <h2>2. The Home screen</h2>
+            <span class="or">ମୂଳ ପୃଷ୍ଠା</span>
+            <ul>
+                <li><b>Collected / Spent / Balance</b> for this year's puja (balance includes last year's leftover money).</li>
+                <li><b>Compared with last year:</b> progress bar against last year's total.</li>
+                <li><b>Active now:</b> which member is contacting which donor right now.</li>
+                <li><b>Today's calls:</b> donors someone promised to call back today.</li>
+                <li><b>Follow-up:</b> how many have not paid yet, and money still to come from promises.</li>
+                <li><b>Checklist</b> jobs due in the next 3 days, and <b>vendor dues</b>.</li>
+                <li><b>Cash in hand:</b> how much money each member is holding.</li>
+            </ul>
+            <p>The green <span class="b wa">Share today's summary on WhatsApp</span> button makes a ready message for the committee
+                group: today's collections, total, cash in hand and pending promises.</p>
+        </section>
+
+        <section id="collect">
+            <h2>3. Adding a collection</h2>
+            <span class="or">ଚାନ୍ଦା ଆଦାୟ ଲେଖିବା</span>
+            <ol class="steps">
+                <li>On the donor's card tap <span class="b p">Paid</span>, or tap the big <span class="b plus">+</span> →
+                    <b>Collection</b>.</li>
+                <li>Check the name (start typing and pick from the list), the amount, and choose <b>Cash</b> or
+                    <b>UPI / Online</b>.</li>
+                <li>For UPI, choose <b>UPI paid into</b>: the main committee QR or a member's own UPI.</li>
+                <li>Optional: <b>Take photo</b> or <b>Gallery / screenshot</b> to attach the payment screenshot.</li>
+                <li>Tap <span class="b p">Save collection</span>.</li>
+            </ol>
+            <p>Every collection gets a receipt number like <b>KP-2026-014</b> and its own receipt page with a
+                <b>Download PDF</b> button.</p>
+            <ul>
+                <li><b>Android app:</b> the receipt SMS with the link goes to the donor automatically from your SIM.</li>
+                <li>Tap <span class="b wa">Send thank-you on WhatsApp</span> to also send it on WhatsApp.</li>
+            </ul>
+            <div class="msg">Namaskar Kuna Rout 🙏
+We have received your contribution of ₹1,500 for Kartikeswar Puja 2026. Thank you for your support!
+Total given ₹2,000 of ₹3,000 · Pending ₹1,000
+Receipt No: KP-2026-014
+Receipt: https://…/receipt.html?r=…</div>
+            <div class="tip"><b>Always save the money the same day.</b> Cash in hand and the daily summary are only right
+                if every collection is entered.</div>
+        </section>
+
+        <section id="parts">
+            <h2>4. Part payments</h2>
+            <span class="or">କିସ୍ତିରେ ଦେବା</span>
+            <p>Some donors promise an amount and pay it in parts, for example ₹3,000 as ₹500, then ₹1,500, then ₹1,000.</p>
+            <ol class="steps">
+                <li>When they promise: <span class="b">Update</span> → <b>Promised to give</b> → Promised amount
+                    <b>3000</b> → Save.</li>
+                <li>Each time they pay, tap <span class="b p">Paid</span> (it says <span class="b p">Add payment</span>
+                    after the first part). The amount still due is filled in already; change it to what they actually
+                    gave.</li>
+            </ol>
+            <div class="card">
+                <b>Kuna Rout</b>
+                <div class="row" style="margin-top:6px"><span>₹2,000 of ₹3,000</span><b>₹1,000 due</b></div>
+                <div class="bar"><span></span></div>
+            </div>
+            <ul>
+                <li>The donor stays in the <b>Part paid</b> list until the full amount comes in, then moves to <b>Paid</b>.</li>
+                <li>Reminders tell them what is pending, and the pay link asks for just that amount.</li>
+                <li>Each receipt shows the running total. The last one says <b>Fully paid ✓</b>.</li>
+                <li>If they say they can't give the rest: <span class="b">Update</span> → tick <b>"Accept ₹2,000 as final"</b>.
+                    They move to Paid and stop getting reminders.</li>
+            </ul>
+        </section>
+
+        <section id="followup">
+            <h2>5. Following up with donors</h2>
+            <span class="or">ବାକି ଚାନ୍ଦା</span>
+            <p>The <b>Follow-up</b> tab lists every donor. Use the chips at the top to filter:</p>
+            <table>
+                <tr><th>List</th><th>Who is in it</th></tr>
+                <tr><td>To follow up</td><td>Everyone who has not fully paid (except "Not giving")</td></tr>
+                <tr><td>Call today</td><td>Call-backs due today or earlier</td></tr>
+                <tr><td>Promised</td><td>Said they will give, nothing paid yet</td></tr>
+                <tr><td>Part paid</td><td>Paid some of what they promised</td></tr>
+                <tr><td>Mine</td><td>Donors assigned to you</td></tr>
+                <tr><td>Not contacted</td><td>Nobody has reached them yet</td></tr>
+                <tr><td>Paid / Not giving</td><td>Done for this year</td></tr>
+            </table>
+            <h3>Buttons on each donor</h3>
+            <ul>
+                <li><span class="b wa">Remind</span> opens WhatsApp with a ready message, including last year's amount and a pay link.</li>
+                <li><span class="b">Call</span> dials the donor. When you come back to the app it asks <b>"How did the
+                    call go?"</b>: tap <b>Paid now</b>, <b>No answer</b> (try again tomorrow), <b>Promised</b>,
+                    <b>Call again later</b> (pick date and time) or <b>Not giving</b>.</li>
+                <li><span class="b">UPI QR</span> shows the QR to scan in person, or sends the pay link.</li>
+                <li><span class="b">Update</span> sets status, promised amount, call-back date, who will follow up, and a note.</li>
+                <li><span class="b p">Paid</span> adds a collection.</li>
+            </ul>
+            <h3>Reminder queue: many donors quickly</h3>
+            <ol class="steps">
+                <li>Tap <span class="b wa">Start reminders</span>, choose a list, and tap Start.</li>
+                <li>Tap the green button → press Send in WhatsApp → come back. The next donor appears by itself.</li>
+                <li>Use <b>Skip</b> for anyone you don't want to message.</li>
+            </ol>
+            <h3>Who is on a donor</h3>
+            <p>When any member reminds, calls or updates a donor, everyone sees it on the card, e.g. "Kuna sent a reminder ·
+                2:30 pm" (green dot = in the last hour). It never blocks you. It only helps avoid sending the same donor
+                three messages in one day.</p>
+            <div class="tip"><b>Messages already include gentle encouragement:</b> how many families have given so far, the
+                usual amount, and the donor title they can reach (Sevak, Pradhan Sevak, Maha Sevak). Nobody who hasn't paid
+                is ever named.</div>
+        </section>
+
+        <section id="sms">
+            <h2>6. SMS reminders (Android app only)</h2>
+            <span class="or">SMS ମନେ ପକାଇବା</span>
+            <ol class="steps">
+                <li>Follow-up → <span class="b">Send SMS reminders</span>.</li>
+                <li>Pick a list. The app shows how many SMS it will use and a preview.</li>
+                <li>Tap Start and <b>keep the app open</b>. SMS go one by one from your own SIM, a few seconds apart.</li>
+            </ol>
+            <div class="warn"><b>Watch your SMS pack.</b> An Odia SMS uses about 2 SMS from your pack. There is a daily
+                limit (90 by default) so your number does not get blocked by the operator.</div>
+        </section>
+
+        <section id="upi">
+            <h2>7. UPI, QR and pay links</h2>
+            <span class="or">UPI ଓ QR</span>
+            <ul>
+                <li><b>In person:</b> tap <span class="b">UPI QR</span> on the donor and let them scan it.</li>
+                <li><b>Far away:</b> the reminder already has a pay link. It opens a page with the QR and a
+                    <b>Copy UPI ID</b> button.</li>
+                <li>After they pay, ask for the screenshot and add the collection as <b>UPI / Online</b>, attaching the screenshot.</li>
+            </ul>
+        </section>
+
+        <section id="myupi">
+            <h2>8. Your own UPI / QR (optional)</h2>
+            <span class="or">ନିଜ UPI</span>
+            <p>The committee has no bank account, so money goes to members' personal UPI. If donors should pay into
+                <b>your</b> account:</p>
+            <ol class="steps">
+                <li><b>More → My UPI &amp; QR</b>.</li>
+                <li>Type your UPI ID, upload your QR image (screenshot from GPay / PhonePe), and tap Save.</li>
+            </ol>
+            <p>From then on your reminders, pay links and QR screen use your account. Others keep using the main QR.
+                To go back, tap <b>Stop using my UPI</b>.</p>
+            <div class="tip"><b>Remember:</b> UPI money in your account counts in <b>your</b> cash in hand. Hand it over
+                like cash (see below).</div>
+        </section>
+
+        <section id="expense">
+            <h2>9. Expenses and vendors</h2>
+            <span class="or">ଖର୍ଚ୍ଚ ଓ ଦୋକାନୀ</span>
+            <ol class="steps">
+                <li><span class="b plus">+</span> → <b>Expense</b> → category (Murti, Tent, Flower…), item, amount,
+                    <b>who paid</b>.</li>
+                <li>Attach a photo of the bill if you have one.</li>
+            </ol>
+            <p><b>More → Vendors &amp; budget</b> is for big bookings paid in parts (Murti, Tent, DJ). Add the vendor with the
+                agreed total and each advance payment. The app shows what is still due. You can also set a budget per category.</p>
+        </section>
+
+        <section id="cash">
+            <h2>10. Cash in hand and handovers</h2>
+            <span class="or">କାହା ପାଖରେ କେତେ ଟଙ୍କା</span>
+            <ul>
+                <li>A cash collection adds to the person who received it.</li>
+                <li>UPI money adds to whoever's account it went into ("Main UPI account" or the member).</li>
+                <li>An expense subtracts from whoever paid.</li>
+            </ul>
+            <p>When you give money to another member: <span class="b plus">+</span> → <b>Cash handover</b> → from, to, amount.
+                This is also how last year's leftover balance is handed out.</p>
+        </section>
+
+        <section id="tasks">
+            <h2>11. Puja checklist</h2>
+            <span class="or">ପୂଜା କାମ ତାଲିକା</span>
+            <p><b>More → Puja checklist</b> has the main jobs from last year (book priest, order Murti, tent, DJ, flowers,
+                Bhoga…) with due dates counted back from the puja date. Assign a job to someone, and tick it when it's done.
+                Add your own with <span class="b plus">+</span> → <b>Checklist task</b>.</p>
+        </section>
+
+        <section id="alarms">
+            <h2>12. Alarms and home-screen widget (Android app)</h2>
+            <span class="or">ଆଲାର୍ମ ଓ ୱିଜେଟ୍</span>
+            <ul>
+                <li><b>Call-back alarms:</b> when you set "Call again on" with a time, your phone rings a reminder then,
+                    even if the app is closed. It rings only for donors assigned to you or to nobody.</li>
+                <li><b>Checklist alarms:</b> at 9 am on the due date of your jobs.</li>
+                <li><b>Widget:</b> long-press your home screen → Widgets → <b>Kartikeswar</b>. Shows today's collection,
+                    the total, and how many are yet to pay.</li>
+            </ul>
+        </section>
+
+        <section id="mistakes">
+            <h2>13. Fixing mistakes</h2>
+            <span class="or">ଭୁଲ ସୁଧାରିବା</span>
+            <ul>
+                <li><b>Entries</b> tab → tap the entry → change and <b>Save changes</b>. The receipt page updates too.</li>
+                <li>Wrong entry? Open it → <b>Delete entry</b>. A deleted collection stays in the list as <b>Cancelled</b>
+                    with its number (so numbers have no gaps), and its receipt page shows <b>CANCELLED</b>.</li>
+                <li>Nothing is ever truly erased, so a mistake can always be recovered.</li>
+            </ul>
+        </section>
+
+        <section id="settings">
+            <h2>14. Settings (for the committee)</h2>
+            <span class="or">ସେଟିଂସ୍</span>
+            <p>Change these only after the committee agrees. They affect everyone.</p>
+            <ul>
+                <li><b>More → Year, UPI &amp; WhatsApp messages:</b> puja year and date, last year's balance, the main UPI ID
+                    and QR, whose account the main UPI is, message language and wording, SMS settings, gentle nudges and
+                    donor titles.</li>
+                <li><b>More → Members:</b> add or remove committee members.</li>
+                <li><b>More → Donors &amp; phone numbers:</b> add donors or paste many numbers at once (<code>Name, 9876543210</code>).</li>
+                <li><b>More → Download / Export:</b> Excel (CSV) files of everything, for the year-end accounts.</li>
+            </ul>
+        </section>
+
+        <section id="faq">
+            <h2>15. Questions</h2>
+            <span class="or">ପ୍ରଶ୍ନ</span>
+            <details>
+                <summary>I saved a collection without internet. Where is the receipt?</summary>
+                <p>The receipt number is given automatically once your phone is online again, and the receipt SMS goes then.
+                    You can send it on WhatsApp later from the Entries tab.</p>
+            </details>
+            <details>
+                <summary>Two of us reminded the same donor. Is that a problem?</summary>
+                <p>No, but check the line on the donor card ("Kuna sent a reminder · 2:30 pm") before messaging,
+                    and use <b>Mine</b> / "Who will follow up" to split donors.</p>
+            </details>
+            <details>
+                <summary>The donor paid more than they promised.</summary>
+                <p>Just enter what they gave. They show as fully paid, and the receipt shows the total.</p>
+            </details>
+            <details>
+                <summary>Can donors see our collection list?</summary>
+                <p>No. Only committee members can open the data. A donor's receipt link shows only their own receipt.</p>
+            </details>
+            <details>
+                <summary>SMS didn't send.</summary>
+                <p>Check that the app has SMS permission (Phone settings → Apps → Kartikeswar → Permissions), that you have SMS
+                    balance, and that you haven't reached the daily limit. You can always send on WhatsApp instead.</p>
+            </details>
+            <details>
+                <summary>Do I need to install a new APK when the app changes?</summary>
+                <p>Usually not. The app loads the latest version from the website by itself. A new APK is shared only when
+                    the Android part changes.</p>
+            </details>
+        </section>
+    </main>
+
+    <footer>
+        <p>Kartikeswar Puja Committee, Karanga · <a href="./">Open the app</a></p>
+    </footer>
+</body>
+
+</html>

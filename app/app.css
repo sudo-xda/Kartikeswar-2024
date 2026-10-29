@@ -640,6 +640,20 @@ h3 {
     margin: 0;
 }
 
+/* Promise paid in parts: "₹2,000 of ₹3,000 · ₹1,000 due" */
+.pledge {
+    margin: 8px 0 0;
+}
+
+.pledge .small {
+    font-size: 0.85rem;
+}
+
+/* "UPI paid into" only matters for UPI collections */
+.form:has(input[name="mode"][value="cash"]:checked) .upi-only {
+    display: none;
+}
+
 .dc-note {
     margin: 8px 0 0;
     padding: 6px 10px;
@@ -679,6 +693,12 @@ h3 {
 .badge.promised {
     background: var(--gold-soft);
     color: #8a5a00;
+}
+
+.badge.partial {
+    background: var(--gold-soft);
+    color: #8a5a00;
+    border: 1px solid currentColor;
 }
 
 .badge.later {
@@ -1407,4 +1427,27 @@ textarea:focus {
     width: 18px;
     height: 18px;
     accent-color: var(--maroon);
+}
+
+/* Android app extras */
+.row-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.sms-preview {
+    margin: 6px 0 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg);
+    font: inherit;
+    font-size: 0.9rem;
+    white-space: pre-wrap;
+    text-align: left;
+}
+
+.done > a.small {
+    color: var(--maroon);
+    font-weight: 600;
 }

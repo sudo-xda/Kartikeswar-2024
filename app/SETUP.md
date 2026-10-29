@@ -40,9 +40,10 @@ Everyone else can be added from inside the app.
 8. **More → Vendors & budget** — add bookings paid in parts (Murti, Tent, DJ) with the agreed total; tap
    **Use 2025 spending as budget** to start each category's budget from last year.
 
-## Updating the database rules (needed once after the UPI / QR update)
+## Updating the database rules (after the UPI / QR and receipt updates)
 
-The public pay page (`pay.html`) reads the committee UPI ID and QR image from one public record.
+The public pay page (`pay.html`) reads the committee UPI ID and QR image from one public record, and each receipt link
+(`receipt.html?r=…`) reads one receipt record that can be opened only with its long random link.
 Copy the latest [firestore.rules](firestore.rules) into Firebase console → Firestore Database → **Rules** → **Publish** again.
 Until then the app works, but the UPI ID / QR image are not saved for the pay page.
 
@@ -59,21 +60,38 @@ Until then the app works, but the UPI ID / QR image are not saved for the pay pa
 
 It works without internet: entries are saved on the phone and sync when the network is back (an orange dot shows entries not yet synced).
 
-## Make an Android APK (optional)
+## Android app (APK)
 
-The APK is a thin shell that opens this app in Chrome (a "Trusted Web Activity"), so Google login keeps working and
-every update you push to GitHub reaches phones automatically. No new APK is needed for app changes.
+The project in [../android-app](../android-app) is a small Android shell (Capacitor 8) that loads this same app from
+GitHub Pages, so every change pushed to GitHub reaches phones without a new APK. The shell adds what a browser cannot:
 
-1. Go to https://www.pwabuilder.com and enter `https://sudo-xda.github.io/Kartikeswar-2024/app/`.
-2. **Package for stores → Android → Generate package** (package ID e.g. `in.kartikeswar.app`, app name `Kartikeswar`).
-3. Download the zip. It contains the `.apk` to install, a `.aab` (only for Play Store), the **signing key** (keep it safe;
-   you need the same key for any future APK) and `assetlinks.json`.
-4. Send the `.apk` on WhatsApp; members tap it and allow "Install unknown apps" once.
+- **SMS reminders from the member's own SIM**, sent one after another without tapping (Follow-up → Send SMS reminders),
+  with a daily limit (Settings, default 90) and a 4-second gap between messages.
+- **Automatic receipt SMS** with the receipt link as soon as a collection is saved (can be turned off in Settings).
+- **Alarms** for "Call again on <date> <time>" and for checklist due dates (9 am), even when the app is closed.
+  Items assigned to someone else ring only on their phone.
+- **Home-screen widget**: today's collection, total collected and donors yet to pay (long-press the home screen →
+  Widgets → Kartikeswar).
+- No address bar.
 
-Without step 5 the app shows a thin address bar at the top; everything still works.
+The call follow-up ("How did the call go?") and the receipt links work in the browser too.
 
-5. To remove the address bar: create a GitHub repo named `sudo-xda.github.io`, add `.well-known/assetlinks.json`
-   (from the zip) and an empty file named `.nojekyll`, and turn on GitHub Pages for it.
+**Login in the APK:** Google sign-in does not work inside the APK yet, so members use a ready-made ID & password
+(see above). Google sign-in can be added later: in Firebase console add an Android app with package `in.kartikeswar.app`
+and SHA-1 `8F:57:DA:42:98:FE:99:F1:82:95:7E:7D:DC:FA:09:BA:39:2F:EC:88`, then download `google-services.json`.
+
+**Build it** (uses the JDK / Android SDK / Gradle already in `openGymv1/.toolchain`, nothing is downloaded):
+
+```
+bash android-app/build-local.sh        →  android-app/Kartikeswar.apk
+```
+
+Share `Kartikeswar.apk` on WhatsApp; members tap it, allow "Install unknown apps" once, and allow SMS and
+notifications when the app asks. A new APK is only needed when the Android part itself changes.
+
+**Keep the signing key safe:** `android-app/kartikeswar-release.jks` and `android-app/keystore.properties` are not in
+GitHub (they are in `.gitignore`). Back both up (e.g. Google Drive). Phones only accept an updated APK signed with
+the same key.
 
 ## Good to know
 
@@ -86,8 +104,17 @@ Without step 5 the app shows a thin address bar at the top; everything still wor
   stays in the list as **Cancelled** with its number, so there are never gaps.
 - **UPI:** the pay page shows the committee QR image (or one made from the UPI ID) and a Copy UPI ID button. It reads both
   only from the database, never from the link, so nobody can make a lookalike link with their own UPI ID.
-- **UPI money is counted in "Bank / UPI account"**, not in the collector's cash in hand. Expenses and cash handovers can
-  also be paid from / moved to the bank account (e.g. depositing collected cash).
+- **Each member's own UPI (optional):** **More → My UPI & QR**. Once added, that member's reminders, pay links and QR
+  screen use their own account instead of the main committee QR. Pay links carry only a random key, never the UPI ID,
+  and fall back to the main QR if the member removes theirs.
+- **UPI money:** a UPI collection asks which account it went into (main QR or a member's own UPI) and is counted there in
+  cash in hand. Money paid to the main QR shows as "Main UPI account (name)": set whose account it is in Settings.
+- **Part payments:** set the promised amount (Update → Promised), then add each payment as its own collection. The donor
+  shows "₹2,000 of ₹3,000 · ₹1,000 due", stays in Follow-up under **Part paid** until the promise is met, and every receipt
+  shows the running total. Update → "Accept as final" closes a promise that will not be paid in full.
+- **Gentle nudges (Settings):** reminders can add "Already N families have contributed ₹X", the usual amount range
+  (only for donors who gave less than that) and the next donor title; receipts and thank-you messages show the donor's title.
+  Titles and amounts are editable; each can be turned off. Nobody who has not paid is ever named.
 - **Photos:** collections can have a payment screenshot and expenses a bill photo (Take photo or Gallery). Each photo is
   shrunk to ~100–200 KB and kept in Firestore (Firebase file storage needs a paid plan); a few thousand photos fit in the free 1 GB.
 - **Reminder queue:** Follow-up → **Start reminders** goes through donors one by one (biggest past donors first). Each
