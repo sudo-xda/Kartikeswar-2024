@@ -10,7 +10,9 @@
     <link rel="icon" href="app/icon-192.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&family=Noto+Sans+Oriya:wght@400;600&family=Yeseva+One&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700&family=Noto+Sans+Oriya:wght@400;600&family=Yeseva+One&display=swap"
+        rel="stylesheet">
     <style>
         :root {
             --bg: #fbf5ec;
@@ -167,7 +169,7 @@
     <header>
         <p class="eyebrow">ଜୟ ମା ସିଦ୍ଧମଙ୍ଗଳା · Jay Maa Siddha Mangala</p>
         <h1>Kartikeswar Puja <span id="year"></span></h1>
-        <p>କରଙ୍ଗା · Karanga</p>
+        <p>କରାଙ୍ଗ · Karanga</p>
     </header>
 
     <main>
@@ -218,7 +220,7 @@
 
         function upiLink(pay, amount) {
             const parts = [`pa=${pay.upiId}`, `pn=${encodeURIComponent(pay.upiName)}`, "cu=INR",
-                `tn=${encodeURIComponent(`Kartikeswar Puja ${year}${donor ? " - " + donor : ""}`)}`];
+            `tn=${encodeURIComponent(`Kartikeswar Puja ${year}${donor ? " - " + donor : ""}`)}`];
             if (Number(amount) > 0) parts.push(`am=${Number(amount)}`);
             return "upi://pay?" + parts.join("&");
         }

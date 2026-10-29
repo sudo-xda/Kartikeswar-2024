@@ -9,7 +9,7 @@ import {
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
     collection, doc, onSnapshot, getDoc, setDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp,
-    terminate, clearIndexedDbPersistence
+    terminate, clearIndexedDbPersistence, deleteField
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Ready-made IDs (e.g. "ravi") become ravi@kartikeswar.app logins
@@ -567,7 +567,16 @@ function tierList() {
     }).filter(Boolean).sort((a, b) => b.min - a.min);
 }
 const tierFor = amount => amount > 0 ? tierList().find(tier => amount >= tier.min) || null : null;
-const tierText = tier => state.settings.msgLang === "en" ? tier.en : tier.or;
+// Message language: each phone can pick its own (Follow-up screen); otherwise the committee setting
+function msgLang() {
+    try {
+        const own = localStorage.getItem("msgLang");
+        if (own === "en" || own === "or") return own;
+    } catch (e) { }
+    return state.settings.msgLang === "en" ? "en" : "or";
+}
+
+const tierText = tier => msgLang() === "en" ? tier.en : tier.or;
 
 // The amount range most families are giving: middle half of this year's donors (or last year's
 // until ten have paid), rounded to the usual donation amounts
@@ -585,7 +594,7 @@ function commonRange() {
 // Message text in the message language (Settings), not the phone's language
 function mt(key, vars = {}) {
     const entry = STR[key];
-    const text = entry ? entry[state.settings.msgLang === "en" ? 0 : 1] : key;
+    const text = entry ? entry[msgLang() === "en" ? 0 : 1] : key;
     return text.replace(/\{(\w+)\}/g, (match, name) => vars[name] !== undefined ? vars[name] : match);
 }
 const inr = amount => Math.round(Number(amount) || 0).toLocaleString("en-IN");
@@ -896,10 +905,15 @@ function renderList() {
     if (LISTS[view] && listEl) listEl.innerHTML = LISTS[view]();
 }
 
+const splashArt = () => `
+    <div class="gods" aria-hidden="true">
+        <img src="img/maa.jpg" alt=""><img src="img/kartikeswar.jpg" alt="">
+    </div>`;
+
 function screenMessage(title, body, actions = "") {
     return `
         <div class="center-screen">
-            <div class="diya" aria-hidden="true"></div>
+            ${splashArt()}
             ${title ? `<h1>${title}</h1>` : ""}
             <p class="muted">${body}</p>
             ${actions}
@@ -914,6 +928,18 @@ function langSwitch() {
         </div>`;
 }
 
+function msgLangSwitch() {
+    const current = msgLang();
+    return `
+        <div class="msg-lang">
+            <span>${t("msgIn")}</span>
+            <div class="lang-switch" role="group" aria-label="${t("msgIn")}">
+                <button data-act="msg-lang" data-lang="or" aria-pressed="${current === "or"}">ଓଡ଼ିଆ</button>
+                <button data-act="msg-lang" data-lang="en" aria-pressed="${current === "en"}">English</button>
+            </div>
+        </div>`;
+}
+
 function searchBox(view, placeholder) {
     return `<input type="search" class="search" id="search-${view}" data-search="${view}"
         value="${esc(state.search[view] || "")}" placeholder="${placeholder}" autocomplete="off">`;
@@ -925,19 +951,16 @@ function viewLogin() {
     return `
         <div class="center-screen login">
             ${langSwitch()}
-            <div class="diya" aria-hidden="true"></div>
+            ${splashArt()}
             <p class="eyebrow">${t("jayMaa")}</p>
             <h1>${t("committee")}</h1>
             <p class="muted">${t("membersOnly")}</p>
-            <button class="btn primary block" data-act="google-login">${t("googleSignIn")}</button>
-            <details class="id-login">
-                <summary>${t("useId")}</summary>
-                <form data-form="login">
-                    <label>${t("userId")}<input name="id" autocomplete="username" autocapitalize="none" required></label>
-                    <label>${t("password")}<input name="password" type="password" autocomplete="current-password" required></label>
-                    <button class="btn block">${t("signIn")}</button>
-                </form>
-            </details>
+            <form class="id-login" data-form="login">
+                <label>${t("userId")}<input name="id" autocomplete="username" autocapitalize="none" required></label>
+                <label>${t("password")}<input name="password" type="password" autocomplete="current-password" required></label>
+                <button class="btn primary block">${t("signIn")}</button>
+            </form>
+            ${isNative ? "" : `<button class="link-btn" data-act="google-login">${t("googleSignInSmall")}</button>`}
         </div>`;
 }
 
@@ -1160,6 +1183,7 @@ function viewFollowup() {
         </div>
         ${state.donors.length ? `<button class="btn wa block queue-btn" data-act="queue-setup">${icon("whatsapp")} ${t("startReminders")}</button>` : ""}
         ${state.donors.length && isNative ? `<button class="btn block queue-btn" data-act="sms-setup">${t("smsReminders")}</button>` : ""}
+        ${msgLangSwitch()}
         ${searchBox("followup", t("searchName"))}
         <div class="chips">
             ${FU_FILTERS.filter(([key]) => key !== "calls" || groups.calls.length).map(([key, label]) => `
@@ -1243,7 +1267,7 @@ function donorCard(donor, paidAmount) {
         <article class="donor-card">
             <div class="dc-top">
                 <div>
-                    <h3>${esc(donor.name)}</h3>
+                    <h3>${esc(donor.name)} <button class="edit-name" data-act="edit-donor" data-id="${donor.id}" aria-label="${t("editDonor")}">✎</button></h3>
                     <p class="muted small">${facts}</p>
                 </div>
                 ${statusBadge(donor, paidAmount)}
@@ -1436,7 +1460,7 @@ function queueAdvance() {
     renderQueue();
 }
 
-const msgKey = base => state.settings.msgLang === "en" ? base : base + "Or";
+const msgKey = base => msgLang() === "en" ? base : base + "Or";
 
 // Values every reminder template can use; {paid}, {pledge} and {due} are there for custom messages
 function reminderVars(donor) {
@@ -1864,6 +1888,7 @@ function viewSettings() {
                         <option value="en" ${s.msgLang === "en" ? "selected" : ""}>${t("english")}</option>
                     </select>
                 </label>
+                <p class="hint">${t("msgLangHint")}</p>
                 <details>
                     <summary>${t("odia")}</summary>
                     <label>${t("reminderMsg")}<textarea name="waReminderOr" rows="9">${esc(s.waReminderOr)}</textarea></label>
@@ -2255,13 +2280,19 @@ function openUpiSheet(donorId, amount) {
 
 function openDonorSheet(donorId) {
     const donor = donorById(donorId);
-    const history = donor && donor.history ? Object.entries(donor.history).sort() : [];
+    const history = (donor && donor.history) || {};
+    const years = [...new Set([...Object.keys(PAST), ...Object.keys(history)])].filter(y => y < year()).sort();
     openSheet(donor ? t("editDonor") : t("newDonorTitle"), `
         <form class="form" data-form="donor" data-id="${donor ? donor.id : ""}">
             <label>${t("name")}<input name="name" required value="${esc(donor ? donor.name : "")}"></label>
             <label>${t("phone")}<input name="phone" type="tel" inputmode="tel" value="${esc(donor ? donor.phone : "")}" placeholder="${t("phoneHint")}"></label>
             <label>${t("note")}<input name="note" value="${esc(donor ? donor.note : "")}" placeholder="${t("donorNoteHint")}"></label>
-            ${history.length ? `<p class="hint">${t("pastGifts", { list: history.map(([y, a]) => `${y} ${rs(a)}`).join(" · ") })}</p>` : ""}
+            ${years.length ? `
+            <fieldset class="past-years">
+                <legend>${t("pastAmounts")}</legend>
+                ${years.map(y => `<label>${y}<input name="h_${y}" type="number" inputmode="numeric" min="0" value="${history[y] > 0 ? history[y] : ""}" placeholder="–"></label>`).join("")}
+            </fieldset>
+            ${donor ? `<p class="hint">${t("renameHint")}</p>` : ""}` : ""}
             <button class="btn primary block">${t("saveDonor")}</button>
             ${donor ? `<button type="button" class="btn danger block" data-act="delete-donor" data-id="${donor.id}">${t("deleteDonor")}</button>` : ""}
         </form>`);
@@ -2470,6 +2501,34 @@ function parseMemberLines(text) {
     return { people, bad };
 }
 
+// Two spellings of the same person: move everything onto the one that stays, then delete the other
+function mergeDonors(from, into, f, editedHistory) {
+    const history = { ...(into.history || {}) };
+    Object.entries(editedHistory).forEach(([y, amount]) => {
+        if (typeof amount === "number") history[y] = (history[y] || 0) + amount;
+    });
+    Object.entries(from.history || {}).forEach(([y, amount]) => {
+        if (!(y in editedHistory) && amount > 0) history[y] = (history[y] || 0) + amount;
+    });
+    const data = {
+        history,
+        phone: into.phone || digits(f.phone),
+        note: [into.note, f.note.trim()].filter(Boolean).join(" · "),
+        aliases: [...new Set([...(into.aliases || []), ...(from.aliases || []), nameKey(from.name)])],
+        ...stamp(false)
+    };
+    const y = year();
+    if (from.fu && from.fu[y] && !(into.fu && into.fu[y])) data.fu = { [y]: from.fu[y] };
+    const batch = writeBatch(db);
+    batch.set(doc(db, "donors", into.id), data, { merge: true });
+    state.collectionsAll.filter(c => c.donorId === from.id).forEach(c =>
+        batch.set(doc(db, yearPath("collections"), c.id), { donorId: into.id, donorName: into.name }, { merge: true }));
+    batch.delete(doc(db, "donors", from.id));
+    commit(batch.commit());
+    closeSheet();
+    toast(t("donorsMerged", { name: into.name }));
+}
+
 // ---------- Saving ----------
 
 const FORMS = {
@@ -2601,15 +2660,32 @@ const FORMS = {
     donor(form) {
         const f = formValues(form);
         const existingId = form.dataset.id;
-        const duplicate = state.donors.find(d => d.id !== existingId && nameKey(d.name) === nameKey(f.name));
-        if (duplicate) return toast(t("donorExists", { name: duplicate.name }));
+        const donor = donorById(existingId);
+        const name = f.name.trim().replace(/\s+/g, " ");
+        const history = {};
+        Object.keys(f).filter(k => k.startsWith("h_")).forEach(k => {
+            const amount = Number(f[k]);
+            history[k.slice(2)] = amount > 0 ? amount : deleteField();
+        });
+
+        const duplicate = state.donors.find(d => d.id !== existingId && nameKey(d.name) === nameKey(name));
+        if (duplicate) {
+            if (!donor) return toast(t("donorExists", { name: duplicate.name }));
+            if (!confirm(t("confirmMerge", { from: donor.name, to: duplicate.name }))) return;
+            return mergeDonors(donor, duplicate, f, history);
+        }
+
+        const batch = writeBatch(db);
         const ref = existingId ? doc(db, "donors", existingId) : doc(collection(db, "donors"));
-        commit(setDoc(ref, {
-            name: f.name.trim(),
-            phone: digits(f.phone),
-            note: f.note.trim(),
-            ...(existingId ? stamp(false) : { history: {}, ...stamp(true) })
-        }, { merge: true }));
+        const data = { name, phone: digits(f.phone), note: f.note.trim(), history };
+        if (donor && name !== donor.name) {
+            // Remember the old spelling so "Import past donors" still finds this person
+            data.aliases = [...new Set([...(donor.aliases || []), nameKey(donor.name)])];
+            state.collectionsAll.filter(c => c.donorId === donor.id && c.donorName !== name)
+                .forEach(c => batch.set(doc(db, yearPath("collections"), c.id), { donorName: name }, { merge: true }));
+        }
+        batch.set(ref, { ...data, ...stamp(!existingId) }, { merge: true });
+        commit(batch.commit());
         closeSheet();
         toast(t("donorSaved"));
     },
@@ -2923,6 +2999,12 @@ const ACTIONS = {
 
     reload: () => location.reload(),
 
+    "msg-lang": el => {
+        try { localStorage.setItem("msgLang", el.dataset.lang); } catch (e) { }
+        render();
+        toast(t("msgLangSet"));
+    },
+
     "clear-data": async () => {
         if (!confirm(t("confirmClearData"))) return;
         // Release Firestore's offline copy so it can be deleted; the server copy is untouched
@@ -3003,19 +3085,22 @@ const ACTIONS = {
             groups.set(key, group);
         }));
         const batch = writeBatch(db);
-        let added = 0, updated = 0;
+        const perDonor = new Map();
+        let added = 0;
         groups.forEach((group, key) => {
-            const existing = state.donors.find(d => nameKey(d.name) === key);
+            const existing = state.donors.find(d => nameKey(d.name) === key || (d.aliases || []).includes(key));
             if (existing) {
-                batch.set(doc(db, "donors", existing.id), { history: group.history }, { merge: true });
-                updated++;
+                const history = perDonor.get(existing.id) || {};
+                Object.entries(group.history).forEach(([y, amount]) => history[y] = (history[y] || 0) + amount);
+                perDonor.set(existing.id, history);
             } else {
                 batch.set(doc(collection(db, "donors")), { name: group.name, phone: "", history: group.history, ...stamp(true) });
                 added++;
             }
         });
+        perDonor.forEach((history, id) => batch.set(doc(db, "donors", id), { history }, { merge: true }));
         commit(batch.commit());
-        toast(t("imported", { added, updated }));
+        toast(t("imported", { added, updated: perDonor.size }));
     },
 
     "export": el => exportData(el.dataset.kind),

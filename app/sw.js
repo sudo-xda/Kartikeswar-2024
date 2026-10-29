@@ -1,6 +1,6 @@
 // Keeps the app opening without internet. Firestore keeps its own offline copy of the data.
 // Bump CACHE when app files change so phones pick up the new version.
-const CACHE = "kartikeswar-app-v9";
+const CACHE = "kartikeswar-app-v10";
 const SHELL = [
     "./",
     "./index.html",
@@ -9,6 +9,8 @@ const SHELL = [
     "./i18n.js",
     "./vendor/qrcode.js",
     "./vendor/capacitor.js",
+    "./img/maa.jpg",
+    "./img/kartikeswar.jpg",
     "./firebase-config.js",
     "./manifest.webmanifest",
     "./icon-192.png",
