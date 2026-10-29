@@ -28,6 +28,44 @@
     <div id="sheet-root"></div>
     <div id="toast" role="status" aria-live="polite"></div>
 
+    <script>
+        // If the app cannot start (old cached files, a blocked download), show why instead of "Loading…" forever
+        (function () {
+            var errors = [];
+            window.addEventListener("error", function (e) {
+                errors.push(e.message || (e.target && (e.target.src || e.target.href)) || "error");
+            }, true);
+            window.addEventListener("unhandledrejection", function (e) {
+                errors.push(String(e.reason && e.reason.message || e.reason));
+            });
+            // Clears cached app files and the offline copy of the data (not the login), then reloads
+            window.kpReset = function () {
+                var jobs = [];
+                if (navigator.serviceWorker) jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    return Promise.all(regs.map(function (r) { return r.unregister(); }));
+                }));
+                if (window.caches) jobs.push(caches.keys().then(function (keys) {
+                    return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+                }));
+                if (indexedDB.databases) jobs.push(indexedDB.databases().then(function (dbs) {
+                    dbs.forEach(function (d) { if (/^firestore/.test(d.name)) indexedDB.deleteDatabase(d.name); });
+                }));
+                var done = function () { location.reload(); };
+                Promise.all(jobs).then(function () { setTimeout(done, 500); }, done);
+                setTimeout(done, 3000);
+            };
+            setTimeout(function () {
+                if (window.__appStarted) return;
+                var msg = errors.join(" · ").replace(/[<>&]/g, "") || "No response. Check the internet. / ଇଣ୍ଟରନେଟ୍ ଦେଖନ୍ତୁ।";
+                document.getElementById("app").innerHTML =
+                    '<div class="center-screen"><div class="diya"></div><h1>App could not start / ଆପ୍ ଖୋଲିଲା ନାହିଁ</h1>' +
+                    '<p class="muted small">' + msg + '</p>' +
+                    '<button class="btn primary" onclick="location.reload()">Reload / ପୁଣି ଖୋଲନ୍ତୁ</button> ' +
+                    '<button class="btn" onclick="kpReset()">Clear saved data &amp; reload</button></div>';
+            }, 15000);
+        })();
+    </script>
+
     <!-- Past years' public data, used to import old donors and last year's balance -->
     <script src="../data.js"></script>
     <script src="vendor/qrcode.js"></script>

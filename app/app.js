@@ -8,7 +8,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, doc, onSnapshot, getDoc, setDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp
+    collection, doc, onSnapshot, getDoc, setDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp,
+    terminate, clearIndexedDbPersistence
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Ready-made IDs (e.g. "ravi") become ravi@kartikeswar.app logins
@@ -338,6 +339,13 @@ function stopData() {
 function watchMembership(user) {
     const email = user.email.toLowerCase();
     state.memberStatus = "checking";
+    // No answer from the server for a long time: offer reload / clear instead of waiting forever
+    clearTimeout(watchMembership.timer);
+    watchMembership.timer = setTimeout(() => {
+        if (state.memberStatus !== "checking") return;
+        state.memberStatus = "slow";
+        render();
+    }, 20000);
     dataUnsubs.push(onSnapshot(doc(db, "members", email), snap => {
         if (!snap.exists()) {
             // Offline on first ever open: wait for the server instead of saying "not allowed"
@@ -718,7 +726,22 @@ function currentView() {
     return VIEWS[view] ? view : "home";
 }
 
+// A crash while drawing a screen shows the error and a way out instead of a frozen screen
 function render() {
+    try {
+        renderApp();
+    } catch (err) {
+        console.error(err);
+        $("#app").innerHTML = screenMessage(t("appError"), esc(err && err.message || err), stuckActions());
+    }
+}
+
+const stuckActions = () => `
+    <button class="btn primary" data-act="reload">${t("reload")}</button>
+    <button class="btn" data-act="clear-data">${t("clearData")}</button>
+    ${state.user ? `<button class="btn" data-act="signout">${t("signOut")}</button>` : ""}`;
+
+function renderApp() {
     const root = $("#app");
     if (!configured) {
         root.innerHTML = screenMessage(t("almostReady"), t("notConfigured"));
@@ -734,6 +757,10 @@ function render() {
     }
     if (state.memberStatus === "checking") {
         root.innerHTML = screenMessage("", t("checkingAccess"));
+        return;
+    }
+    if (state.memberStatus === "slow") {
+        root.innerHTML = screenMessage(t("slowTitle"), t("slowBody"), stuckActions());
         return;
     }
     if (state.memberStatus === "denied") {
@@ -2894,6 +2921,15 @@ const ACTIONS = {
         closeSheet();
     },
 
+    reload: () => location.reload(),
+
+    "clear-data": async () => {
+        if (!confirm(t("confirmClearData"))) return;
+        // Release Firestore's offline copy so it can be deleted; the server copy is untouched
+        try { await terminate(db); await clearIndexedDbPersistence(db); } catch (e) { }
+        window.kpReset();
+    },
+
     "remove-member": (el, id) => {
         if (!confirm(t("confirmRemove", { name: memberName(id) }))) return;
         commit(deleteDoc(doc(db, "members", id)));
@@ -3178,6 +3214,7 @@ if (isNative) {
 
 if (configured) {
     onAuthStateChanged(auth, user => {
+        window.__appStarted = true;
         stopData();
         state.user = user;
         state.authReady = true;
