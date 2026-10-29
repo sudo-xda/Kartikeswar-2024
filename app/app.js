@@ -8,8 +8,8 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
     initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-    collection, doc, onSnapshot, getDoc, setDoc, deleteDoc, writeBatch, runTransaction, serverTimestamp,
-    terminate, clearIndexedDbPersistence, deleteField
+    collection, doc, onSnapshot, getDoc, setDoc as rawSetDoc, deleteDoc as rawDeleteDoc, writeBatch as rawWriteBatch,
+    runTransaction, serverTimestamp, terminate, clearIndexedDbPersistence, deleteField, query, orderBy, limit
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 // Ready-made IDs (e.g. "ravi") become ravi@kartikeswar.app logins
@@ -251,7 +251,13 @@ const state = {
     smsRun: null, // running SMS batch: { ids, index, sent, failed, stopped, done, limitHit }
     search: {},
     fuFilter: "todo",
-    entriesTab: "collections"
+    entriesTab: "collections",
+    donorsAll: [], // includes deleted donors, so they can be restored and are not re-imported
+    raw: {}, // this year's lists as stored, including deleted entries (for the edit history)
+    savedSettings: null,
+    log: [], // edit history, newest first (loaded only while the History screen is open)
+    logLimit: 200,
+    logFilter: "all"
 };
 
 let dataUnsubs = [];
@@ -329,6 +335,7 @@ function onDataError(err) {
 }
 
 function stopData() {
+    stopLogWatch();
     dataUnsubs.forEach(unsub => unsub());
     yearUnsubs.forEach(unsub => unsub());
     dataUnsubs = [];
@@ -381,13 +388,14 @@ function watchMyPay(key) {
 
 function startData() {
     dataUnsubs.push(onSnapshot(collection(db, "members"), snap => {
-        state.members = active(toList(snap)).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+        state.members = toList(snap).sort((a, b) => (a.name || "").localeCompare(b.name || ""));
         scheduleRender();
     }, onDataError));
 
     dataUnsubs.push(onSnapshot(collection(db, "donors"), snap => {
         const firstLoad = !state.donors.length;
-        state.donors = active(toList(snap));
+        state.donorsAll = toList(snap);
+        state.donors = active(state.donorsAll);
         scheduleRender();
         // The app may have been closed during a call; ask about it once the donors are loaded
         if (firstLoad) setTimeout(checkPendingCall, 800);
@@ -401,6 +409,7 @@ function startData() {
 
     dataUnsubs.push(onSnapshot(doc(db, "settings", "app"), snap => {
         const saved = snap.exists() ? snap.data() : {};
+        state.savedSettings = snap.exists() ? saved : null;
         const oldYear = year();
         state.settings = { ...DEFAULT_SETTINGS, ...saved };
         if (saved.openingBalance === undefined) state.settings.openingBalance = pastClosing(prevYear());
@@ -411,8 +420,10 @@ function startData() {
 
 function startYear() {
     yearUnsubs.forEach(unsub => unsub());
+    stopLogWatch();
     const watch = (kind, handle) => onSnapshot(collection(db, yearPath(kind)), { includeMetadataChanges: true }, snap => {
-        handle(toList(snap));
+        state.raw[kind] = toList(snap);
+        handle(state.raw[kind]);
         scheduleRender();
     }, onDataError);
 
@@ -725,10 +736,11 @@ const VIEWS = {
     members: viewMembers,
     settings: viewSettings,
     myupi: viewMyUpi,
-    export: viewExport
+    export: viewExport,
+    history: viewHistory
 };
-const LISTS = { followup: followupList, entries: entriesList, donors: donorsList };
-const NAV_PARENT = { tasks: "more", spending: "more", donors: "more", members: "more", settings: "more", myupi: "more", export: "more" };
+const LISTS = { followup: followupList, entries: entriesList, donors: donorsList, history: historyList };
+const NAV_PARENT = { tasks: "more", spending: "more", donors: "more", members: "more", settings: "more", myupi: "more", export: "more", history: "more" };
 
 function currentView() {
     const view = location.hash.slice(1);
@@ -1314,7 +1326,7 @@ function markLead(donorId, action) {
     const update = { leadBy: state.me.id, leadAction: action, leadAt: serverTimestamp() };
     if (action === "remind" || action === "call" || action === "sms") Object.assign(update, { contactedAt: today(), contactedBy: state.me.id });
     if (!fu.assignedTo) update.assignedTo = state.me.id;
-    commit(setDoc(doc(db, "donors", donorId), { fu: { [year()]: update } }, { merge: true }));
+    commit(setDoc(doc(db, "donors", donorId), { fu: { [year()]: update } }, { merge: true }, true));
 }
 
 // --- Reminder queue: one donor after another, each sent by hand from your own WhatsApp ---
@@ -1638,13 +1650,15 @@ function viewMore() {
             ${menuItem("#members", t("mMembers"), t("mMembersSub", { n: state.members.length }))}
             ${menuItem("#myupi", t("mMyUpi"), payInfo().key ? t("mMyUpiOn") : t("mMyUpiOff"))}
             ${menuItem("#settings", t("mSettings"), t("mSettingsSub", { year: esc(year()) }))}
+            ${menuItem("#history", t("mHistory"), t("mHistorySub"))}
             ${menuItem("#export", t("mExport"), t("mExportSub"))}
             ${menuItem("", t("mImport"), t("mImportSub", { years: pastYears }), "import-past")}
         </div>
         <div class="menu">
             ${menuItem("guide.html", t("mGuide"), t("mGuideSub"))}
             ${menuItem("", t("signOut"), esc(state.user.email), "signout")}
-        </div>`;
+        </div>
+        <p class="made-by">Made with <span class="heart" aria-label="love">♥</span> by Jeevan</p>`;
 }
 
 // --- Checklist ---
@@ -2523,10 +2537,253 @@ function mergeDonors(from, into, f, editedHistory) {
     batch.set(doc(db, "donors", into.id), data, { merge: true });
     state.collectionsAll.filter(c => c.donorId === from.id).forEach(c =>
         batch.set(doc(db, yearPath("collections"), c.id), { donorId: into.id, donorName: into.name }, { merge: true }));
-    batch.delete(doc(db, "donors", from.id));
+    batch.set(doc(db, "donors", from.id), { deleted: true, mergedInto: into.id, deletedBy: state.me.id, deletedAt: serverTimestamp() }, { merge: true });
     commit(batch.commit());
     closeSheet();
     toast(t("donorsMerged", { name: into.name }));
+}
+
+// ---------- Edit history ----------
+// Every change a member makes also writes one line to years/<year>/log: who, when, what changed (old → new).
+// Nothing is erased: deleted donors and entries are only marked deleted and can be restored from the History screen.
+// The database rules allow adding to years/… but never deleting, so the history itself cannot be wiped from the app.
+
+const LOG_SKIP = /^(public|receipts)\/|\/(log|photos)\/|\/meta\/counters$/;
+const QUIET_FIELD = /^(id|_pending|createdAt|createdBy|updatedAt|updatedBy|deletedAt|deletedBy|deleted|receiptNo|receiptToken|aliases|payKey|hasOwnUpi|donorId|vendorId|order|doneBy|doneAt|mergedInto)$|(^|\.)(lead\w*|contacted\w*|createdAt|createdBy|updatedAt|updatedBy)$/;
+const isSentinel = v => v && typeof v === "object" && (v.__sts || v.__del || v._methodName);
+const isDelete = v => v && typeof v === "object" && (v.__del || v._methodName === "deleteField");
+const isPlain = v => v && typeof v === "object" && !Array.isArray(v) && !isSentinel(v) && !v.toMillis && !v.__ts;
+
+function flatten(obj, prefix = "", out = {}) {
+    Object.entries(obj || {}).forEach(([k, v]) => {
+        const key = prefix ? `${prefix}.${k}` : k;
+        if (isPlain(v)) flatten(v, key, out);
+        else out[key] = v;
+    });
+    return out;
+}
+
+const blank = v => v === undefined || v === null || v === "";
+const sameValue = (a, b) => ((blank(a) || a === false) && (blank(b) || b === false)) || JSON.stringify(a) === JSON.stringify(b);
+const shortValue = v => typeof v === "string" && v.length > 200 ? v.slice(0, 200) + "…" : v;
+
+// The stored copy of a document as this phone last saw it (deleted ones included)
+function cachedDoc(path) {
+    const parts = path.split("/");
+    const id = parts[parts.length - 1];
+    const find = list => (list || []).find(d => d.id === id);
+    if (parts[0] === "donors") return find(state.donorsAll);
+    if (parts[0] === "members") return find(state.members);
+    if (path === "settings/app") return state.savedSettings || undefined;
+    if (parts[0] === "years" && parts[1] === year()) return find(state.raw[parts[2]]);
+    return undefined;
+}
+
+const LOG_KIND = { donors: "donor", members: "member", settings: "settings", collections: "collection",
+    expenses: "expense", moves: "move", vendors: "vendor", tasks: "task", meta: "budget" };
+const kindOf = path => {
+    const parts = path.split("/");
+    return LOG_KIND[parts[0] === "years" ? parts[2] : parts[0]] || parts[0];
+};
+
+function labelOf(kind, d, id) {
+    switch (kind) {
+        case "donor": return d.name || "";
+        case "member": return `${d.name || ""} (${shortId(id)})`;
+        case "collection": return `${d.donorName || ""} ${rs(d.amount)}`;
+        case "expense": return `${d.item || d.category || ""} ${rs(d.amount)}`;
+        case "move": return `${memberName(d.from)} → ${memberName(d.to)} ${rs(d.amount)}`;
+        case "vendor": return d.name || "";
+        case "task": return d.title || "";
+        default: return "";
+    }
+}
+
+// One history line for a write, or null when nothing worth recording changed
+function logFor(path, data) {
+    if (LOG_SKIP.test(path) || !state.me) return null;
+    const before = cachedDoc(path);
+    const kind = kindOf(path);
+    const id = path.split("/").pop();
+    const action = !before ? "add"
+        : data.deleted === true && !before.deleted ? "delete"
+        : data.deleted === false && before.deleted ? "restore" : "edit";
+    const old = flatten(before);
+    const changes = action !== "edit" ? [] : Object.entries(flatten(data))
+        .filter(([field, value]) => !QUIET_FIELD.test(field) && !(isSentinel(value) && !isDelete(value)))
+        .map(([field, value]) => ({ field, from: shortValue(old[field] ?? ""), to: isDelete(value) ? "" : shortValue(value ?? "") }))
+        .filter(c => !sameValue(c.from, c.to));
+    if (action === "edit" && !changes.length) return null;
+    const after = { ...(before || {}) };
+    Object.entries(data).forEach(([k, v]) => { if (!isSentinel(v) && !isPlain(v)) after[k] = v; });
+    return { at: serverTimestamp(), by: state.me.id, action, kind, path, label: labelOf(kind, after, id), changes };
+}
+
+function logDelete(path) {
+    const before = cachedDoc(path);
+    if (LOG_SKIP.test(path) || !state.me || !before) return null;
+    const kind = kindOf(path);
+    const copy = { ...before };
+    delete copy.id;
+    delete copy._pending;
+    return { at: serverTimestamp(), by: state.me.id, action: "delete", kind, path, label: labelOf(kind, before, before.id),
+        changes: [], removed: true, before: copy };
+}
+
+const logRef = () => doc(collection(db, yearPath("log")));
+// A summary line for bulk work; stored as a text key so each phone shows it in its own language
+const logNote = (batch, kind, key, vars) =>
+    batch.set(logRef(), { at: serverTimestamp(), by: state.me.id, action: "bulk", kind, path: "", label: "", key, vars, changes: [] });
+
+// Same as Firestore's setDoc / deleteDoc / writeBatch, plus the history line in the same write.
+// quiet = true skips the history (for automatic marks and bulk imports, which add one summary line instead).
+function setDoc(ref, data, opts, quiet) {
+    const line = !quiet && logFor(ref.path, data);
+    if (!line) return opts ? rawSetDoc(ref, data, opts) : rawSetDoc(ref, data);
+    const batch = rawWriteBatch(db);
+    opts ? batch.set(ref, data, opts) : batch.set(ref, data);
+    batch.set(logRef(), line);
+    return batch.commit();
+}
+
+function deleteDoc(ref) {
+    const line = logDelete(ref.path);
+    if (!line) return rawDeleteDoc(ref);
+    const batch = rawWriteBatch(db);
+    batch.delete(ref);
+    batch.set(logRef(), line);
+    return batch.commit();
+}
+
+function writeBatch(database, quiet) {
+    const batch = rawWriteBatch(database);
+    const wrapped = {
+        set(ref, data, opts) {
+            const line = !quiet && logFor(ref.path, data);
+            opts ? batch.set(ref, data, opts) : batch.set(ref, data);
+            if (line) batch.set(logRef(), line);
+            return wrapped;
+        },
+        delete(ref) {
+            const line = !quiet && logDelete(ref.path);
+            batch.delete(ref);
+            if (line) batch.set(logRef(), line);
+            return wrapped;
+        },
+        commit: () => batch.commit()
+    };
+    return wrapped;
+}
+
+// --- History screen ---
+
+let logUnsub = null;
+function startLogWatch() {
+    if (logUnsub || !db) return;
+    logUnsub = onSnapshot(query(collection(db, yearPath("log")), orderBy("at", "desc"), limit(state.logLimit)), snap => {
+        state.log = toList(snap);
+        if (currentView() === "history") scheduleRender();
+    }, () => { });
+}
+function stopLogWatch() {
+    if (logUnsub) logUnsub();
+    logUnsub = null;
+}
+
+const canRestore = e => e.action === "delete" && e.path && (e.removed
+    ? !cachedDoc(e.path)
+    : Boolean((cachedDoc(e.path) || {}).deleted));
+
+function restoreFromLog(e) {
+    if (!e || !canRestore(e)) return;
+    if (!confirm(t("confirmRestore", { what: e.label }))) return;
+    if (e.removed) {
+        const batch = rawWriteBatch(db);
+        batch.set(doc(db, e.path), { ...e.before, ...stamp(false) });
+        batch.set(logRef(), { at: serverTimestamp(), by: state.me.id, action: "restore", kind: e.kind, path: e.path, label: e.label, changes: [] });
+        commit(batch.commit());
+    } else {
+        commit(setDoc(doc(db, e.path), { deleted: false, deletedBy: deleteField(), deletedAt: deleteField(), mergedInto: deleteField(), ...stamp(false) }, { merge: true }));
+        const entry = cachedDoc(e.path);
+        if (e.kind === "collection" && entry && entry.receiptToken) {
+            commit(rawSetDoc(receiptRef(entry.receiptToken), { status: deleteField(), updatedAt: serverTimestamp() }, { merge: true }));
+        }
+    }
+    toast(t("restored"));
+}
+
+const MONEY_FIELD = /^(amount|promised|total|openingBalance)$|^history\.|^categories\.|\.promised$/;
+const PERSON_FIELD = /(^|\.)(collectedBy|paidBy|from|to|assignedTo|upiTo|upiOwner)$/;
+
+const STATUS_LABEL = { noanswer: "sNoAnswer", pending: "sNotDecided", promised: "sPromised", later: "sLater", declined: "sDeclined" };
+
+function fieldLabel(field) {
+    const f = field.replace(/^fu\.\d{4}\./, "");
+    if (/^history\.\d{4}$/.test(f)) return t("lfHistory", { year: f.slice(8) });
+    if (/^categories\./.test(f)) return f.slice(11);
+    const key = "lf_" + f;
+    return STR[key] ? t(key) : f;
+}
+
+function fieldValue(field, v) {
+    if (blank(v)) return "–";
+    if (typeof v === "boolean") return v ? "✓" : "✗";
+    if (v && v.toMillis) return fmtWhenMs(v.toMillis());
+    if (MONEY_FIELD.test(field)) return rs(v);
+    if (PERSON_FIELD.test(field)) return esc(memberName(v));
+    if (/(^|\.)status$/.test(field) && STATUS_LABEL[v]) return t(STATUS_LABEL[v]);
+    if (field === "mode") return t(v === "upi" ? "upiOnline" : "cash");
+    if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return fmtDate(v);
+    const text = String(v);
+    return esc(text.length > 60 ? text.slice(0, 60) + "…" : text);
+}
+
+const fmtWhenMs = ms => new Date(ms).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+function viewHistory() {
+    startLogWatch();
+    const deleted = state.log.filter(e => e.action === "delete").length;
+    return `
+        <div class="view-head">
+            <a href="#more" class="back">${t("back")}</a>
+            <h1>${t("historyTitle")}</h1>
+            <p class="muted">${t("historySub")}</p>
+        </div>
+        <div class="chips">
+            <button class="chip" data-act="log-filter" data-filter="all" aria-pressed="${state.logFilter === "all"}">${t("logAll")}</button>
+            <button class="chip" data-act="log-filter" data-filter="delete" aria-pressed="${state.logFilter === "delete"}">${t("logDeleted")} <span>${deleted}</span></button>
+        </div>
+        ${searchBox("history", t("searchHistory"))}
+        <div id="list" class="log-list">${historyList()}</div>
+        ${state.log.length >= state.logLimit ? `<button class="btn block" data-act="log-more">${t("loadMore")}</button>` : ""}`;
+}
+
+function historyList() {
+    const term = searchTerm("history");
+    const list = state.log
+        .filter(e => state.logFilter !== "delete" || e.action === "delete")
+        .filter(e => !term || nameKey(`${e.label} ${memberName(e.by)} ${t("lk_" + e.kind)}`).includes(term));
+    if (!list.length) return `<div class="empty">${t(state.log.length ? "nobodyHere" : "noHistory")}</div>`;
+    let day = "";
+    return list.map(e => {
+        const ms = millis(e.at);
+        const thisDay = ms ? new Date(ms).toDateString() : "";
+        const head = thisDay !== day ? `<h2 class="group-title">${ms ? fmtDate(new Date(ms - new Date(ms).getTimezoneOffset() * 60000).toISOString().slice(0, 10)) : ""}</h2>` : "";
+        day = thisDay;
+        const what = e.key ? t(e.key, e.vars || {}) : t("lk_" + e.kind);
+        const changes = (e.changes || []).map(c => `
+            <li><span class="muted">${esc(fieldLabel(c.field))}:</span> ${fieldValue(c.field, c.from)} → <b>${fieldValue(c.field, c.to)}</b></li>`).join("");
+        return `${head}
+            <div class="log-row ${e.action}">
+                <div class="row-between">
+                    <span><b>${esc(memberName(e.by))}</b> · ${t("la_" + e.action, { what })}</span>
+                    <span class="muted small">${ms ? new Date(ms).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }) : ""}</span>
+                </div>
+                ${e.label ? `<div class="log-label">${esc(e.label)}</div>` : ""}
+                ${changes ? `<ul class="log-changes">${changes}</ul>` : ""}
+                ${canRestore(e) ? `<button class="btn small" data-act="restore" data-id="${e.id}">${t("restore")}</button>` : ""}
+            </div>`;
+    }).join("");
 }
 
 // ---------- Saving ----------
@@ -2579,11 +2836,13 @@ const FORMS = {
         const ref = doc(collection(db, yearPath("collections")));
         const given = givenUpTo({ ...data, id: ref.id });
         const entry = { ...data, ...savePhoto("collections", ref.id), ...stamp(true) };
+        const logLine = logFor(ref.path, entry);
         form.querySelector("button:not([type])").disabled = true;
         let receipt = null;
         if (navigator.onLine) {
             try { receipt = await saveWithReceipt(ref, entry); } catch (e) { receipt = null; }
         }
+        if (receipt && logLine) commit(rawSetDoc(logRef(), logLine));
         // Offline or slow: save without a number; it is numbered automatically once synced.
         // Same document id, so a late transaction and this write never make two entries.
         if (!receipt) commit(setDoc(ref, entry, { merge: true }));
@@ -2753,7 +3012,8 @@ const FORMS = {
         const preview = parseNumberLines(text);
         if (!submitter || submitter.name !== "confirm") return openPasteNumbersSheet(text, preview);
 
-        const batch = writeBatch(db);
+        const batch = writeBatch(db, true);
+        logNote(batch, "donor", "logNumbers", { n: preview.matched.length + preview.added.length });
         preview.matched.forEach(({ phone, donor }) =>
             batch.set(doc(db, "donors", donor.id), { phone }, { merge: true }));
         preview.added.forEach(({ name, phone }) =>
@@ -2993,11 +3253,24 @@ const ACTIONS = {
     "delete-donor": (el, id) => {
         if (state.collections.some(c => c.donorId === id)) return toast(t("donorHasCollections"));
         if (!confirm(t("confirmDeleteDonor"))) return;
-        commit(deleteDoc(doc(db, "donors", id)));
+        commit(setDoc(doc(db, "donors", id), { deleted: true, deletedBy: state.me.id, deletedAt: serverTimestamp() }, { merge: true }));
         closeSheet();
     },
 
     reload: () => location.reload(),
+
+    restore: (el, id) => restoreFromLog(state.log.find(e => e.id === id)),
+
+    "log-filter": el => {
+        state.logFilter = el.dataset.filter;
+        render();
+    },
+
+    "log-more": () => {
+        state.logLimit += 200;
+        stopLogWatch();
+        render();
+    },
 
     "msg-lang": el => {
         try { localStorage.setItem("msgLang", el.dataset.lang); } catch (e) { }
@@ -3015,6 +3288,7 @@ const ACTIONS = {
     "remove-member": (el, id) => {
         if (!confirm(t("confirmRemove", { name: memberName(id) }))) return;
         commit(deleteDoc(doc(db, "members", id)));
+        toast(t("memberRemovedRestore"));
     },
 
     "reset-messages": el => {
@@ -3084,11 +3358,12 @@ const ACTIONS = {
             group.name = d.name.trim().replace(/\s+/g, " ");
             groups.set(key, group);
         }));
-        const batch = writeBatch(db);
+        const batch = writeBatch(db, true);
         const perDonor = new Map();
         let added = 0;
         groups.forEach((group, key) => {
-            const existing = state.donors.find(d => nameKey(d.name) === key || (d.aliases || []).includes(key));
+            const existing = state.donorsAll.find(d => nameKey(d.name) === key || (d.aliases || []).includes(key));
+            if (existing && existing.deleted) return; // deleted on purpose: don't bring back
             if (existing) {
                 const history = perDonor.get(existing.id) || {};
                 Object.entries(group.history).forEach(([y, amount]) => history[y] = (history[y] || 0) + amount);
@@ -3099,6 +3374,7 @@ const ACTIONS = {
             }
         });
         perDonor.forEach((history, id) => batch.set(doc(db, "donors", id), { history }, { merge: true }));
+        logNote(batch, "donor", "logImported", { added, updated: perDonor.size });
         commit(batch.commit());
         toast(t("imported", { added, updated: perDonor.size }));
     },
@@ -3243,6 +3519,7 @@ document.addEventListener("change", e => {
 });
 
 window.addEventListener("hashchange", () => {
+    if (currentView() !== "history") stopLogWatch();
     formDirty = false;
     state.pendingQr = undefined;
     window.scrollTo(0, 0);

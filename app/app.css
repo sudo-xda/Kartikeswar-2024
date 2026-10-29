@@ -1535,3 +1535,49 @@ textarea:focus {
     font-weight: 600;
     color: var(--muted);
 }
+
+
+/* Edit history */
+.log-row {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    font-size: 0.92rem;
+}
+
+.log-row.delete {
+    border-left: 4px solid var(--red);
+}
+
+.log-row.restore,
+.log-row.add {
+    border-left: 4px solid var(--green);
+}
+
+.log-label {
+    margin-top: 2px;
+    font-weight: 600;
+}
+
+.log-changes {
+    margin: 6px 0 0;
+    padding-left: 18px;
+    font-size: 0.88rem;
+}
+
+.log-row .btn {
+    margin-top: 8px;
+}
+
+.made-by {
+    margin: 20px 0 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--muted);
+}
+
+.made-by .heart {
+    color: #e0245e;
+}

@@ -107,7 +107,10 @@ the same key.
 - **Cost:** free. 10–12 people with a few hundred donors stays well inside Firebase's free daily limits.
 - **Privacy:** the code in this repo is public, but the data is not: Firestore rules only let listed members read or write.
   `firebase-config.js` is safe to commit; it only identifies the project.
-- **Deleting:** deleted collections/expenses are only hidden (marked deleted), so a mistake can be recovered from the Firebase console.
+- **Deleting & edit history:** nothing is erased: donors, collections, expenses and vendors are only marked deleted.
+  Every change is logged in `years/<year>/log` (who, when, old → new), shown in **More → Edit history**, where deleted
+  items (and removed members) can be restored. The rules never allow deleting anything under `years/`, so the history
+  can't be wiped from the app. No rules update needed.
 - **Receipt numbers:** every collection gets `KP-<year>-001`, `002`… from one shared counter, so two phones never get the same number.
   A collection saved without internet gets its number automatically once that phone is online again. A deleted collection
   stays in the list as **Cancelled** with its number, so there are never gaps.
