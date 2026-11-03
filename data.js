@@ -753,7 +753,12 @@ const pujaData = {
         ],
         "total": 8469
       }
-    ]
+    ],
+    "adjustment": {
+      "label": "Adjustment as per committee accounts",
+      "amount": -3816,
+      "hidden": true
+    }
   },
   "2024": {
     "donations": [

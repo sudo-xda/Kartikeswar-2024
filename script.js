@@ -75,9 +75,13 @@ function carryForward(year) {
     return closingBalance(previousYear);
 }
 
+// A correction agreed by the committee (e.g. 2025), shown as its own line in the Balance table
+const adjustmentOf = year => (pujaData[year] && pujaData[year].adjustment) || null;
+
 function closingBalance(year) {
     const totals = calculateTotal(year);
-    return carryForward(year) + totals.donations - totals.expenditure;
+    const adjustment = adjustmentOf(year);
+    return carryForward(year) + totals.donations - totals.expenditure + (adjustment ? Number(adjustment.amount) || 0 : 0);
 }
 
 function changeNote(current, previous, previousYear) {
@@ -182,6 +186,11 @@ function renderBalance(year) {
     if (pujaData[previousYear]) rows.push([`Carry Forward (${previousYear})`, formatRs(cf)]);
     rows.push([`Total Collection (${year})`, formatRs(totals.donations)]);
     rows.push([`Total Expenditure (${year})`, "−" + formatRs(totals.expenditure)]);
+    const adjustment = adjustmentOf(year);
+    if (adjustment && !adjustment.hidden) {
+        const amount = Number(adjustment.amount) || 0;
+        rows.push([escapeHtml(adjustment.label || "Adjustment"), (amount < 0 ? "−" : "+") + formatRs(Math.abs(amount))]);
+    }
 
     const sign = balance >= 0 ? "+" : "−";
     document.querySelector("#balance-table tbody").innerHTML =

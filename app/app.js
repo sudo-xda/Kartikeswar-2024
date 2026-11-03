@@ -150,10 +150,14 @@ function toCsv(rows) {
 }
 
 // Closing balance of a past year, as shown on the public website
-function pastClosing(year) {
+const defaultOpening = y => pastClosing(String(Number(y) - 1));
+
+// Closing balance of a past year, as on the public website (including any committee adjustment in data.js)
+function pastClosing(year, withAdjustment = true) {
     const data = PAST[year];
     if (!data) return 0;
-    return pastClosing(String(Number(year) - 1)) + sum(data.donations) - sum(data.expenditure, "total");
+    const adjustment = withAdjustment && data.adjustment ? Number(data.adjustment.amount) || 0 : 0;
+    return pastClosing(String(Number(year) - 1)) + sum(data.donations) - sum(data.expenditure, "total") + adjustment;
 }
 
 function pastCategoryTotal(year, category) {
@@ -232,7 +236,7 @@ const state = {
     user: null,
     memberStatus: "checking", // checking | ok | denied
     me: null,
-    settings: { ...DEFAULT_SETTINGS, openingBalance: pastClosing(String(Number(thisYear) - 1)) },
+    settings: { ...DEFAULT_SETTINGS, openingBalance: defaultOpening(thisYear) },
     members: [],
     donors: [],
     collectionsAll: [], // includes cancelled ones, so receipt numbers have no gaps
@@ -257,7 +261,8 @@ const state = {
     savedSettings: null,
     log: [], // edit history, newest first (loaded only while the History screen is open)
     logLimit: 200,
-    logFilter: "all"
+    logFilter: "all",
+    smFrom: 0 // first receipt number printed as SM-… (earlier ones stay KP-…)
 };
 
 let dataUnsubs = [];
@@ -299,7 +304,9 @@ function payInfo() {
 const hasUpi = () => Boolean(payInfo().upiId || payInfo().qrImage);
 // Members whose own UPI can receive money (for "UPI paid into" on a collection)
 const ownUpiMembers = () => state.members.filter(m => m.payKey && m.hasOwnUpi);
-const receiptLabel = number => number ? `KP-${year()}-${String(number).padStart(3, "0")}` : "";
+// Receipts given out before the switch keep KP-…; from smFrom (stored on the shared counter) they are SM-…
+const receiptLabel = number => number
+    ? `${state.smFrom && number >= state.smFrom ? "SM" : "KP"}-${year()}-${String(number).padStart(3, "0")}` : "";
 
 function stamp(isNew) {
     return isNew
@@ -412,7 +419,11 @@ function startData() {
         state.savedSettings = snap.exists() ? saved : null;
         const oldYear = year();
         state.settings = { ...DEFAULT_SETTINGS, ...saved };
-        if (saved.openingBalance === undefined) state.settings.openingBalance = pastClosing(prevYear());
+        // Not set yet, or still a website figure Settings pre-filled (before or after the adjustment): use the website's
+        const savedOpening = Number(saved.openingBalance);
+        if (saved.openingBalance === undefined || savedOpening === pastClosing(prevYear()) || savedOpening === pastClosing(prevYear(), false)) {
+            state.settings.openingBalance = defaultOpening(year());
+        }
         if (oldYear !== year() || yearUnsubs.length === 0) startYear();
         scheduleRender();
     }, onDataError));
@@ -437,20 +448,31 @@ function startYear() {
         watch("moves", list => state.moves = active(list).sort(byNewest)),
         watch("vendors", list => state.vendors = active(list).sort((a, b) => (a.name || "").localeCompare(b.name || ""))),
         watch("tasks", list => state.tasks = active(list)),
-        watch("meta", list => state.budget = ((list.find(d => d.id === "budget") || {}).categories) || {})
+        watch("meta", list => {
+            state.budget = ((list.find(d => d.id === "budget") || {}).categories) || {};
+            state.smFrom = Number((list.find(d => d.id === "counters") || {}).smFrom) || 0;
+        })
     ];
 }
 
 // ---------- Receipt numbers ----------
-// A shared counter hands out KP-2026-001, 002… inside a transaction, so two phones never get
+// A shared counter hands out SM-2026-001, 002… inside a transaction, so two phones never get
 // the same number. Transactions need internet; entries saved offline get their number
 // automatically once the phone is back online.
 
 const counterRef = () => doc(db, yearPath("meta"), "counters");
 const numbering = new Set();
 
+// Also records smFrom (the first SM number) the first time, in the same transaction, so every phone agrees
 function nextReceipt(tx) {
-    return tx.get(counterRef()).then(snap => (snap.exists() ? Number(snap.data().receipt) || 0 : 0) + 1);
+    return tx.get(counterRef()).then(snap => {
+        const data = snap.exists() ? snap.data() : {};
+        const number = (Number(data.receipt) || 0) + 1;
+        const smFrom = Number(data.smFrom) || number;
+        tx.set(counterRef(), { receipt: number, smFrom }, { merge: true });
+        state.smFrom = smFrom;
+        return number;
+    });
 }
 
 // Each receipt also gets a public page (receipt.html?r=<token>) that only someone with the
@@ -491,7 +513,6 @@ function saveWithReceipt(ref, data) {
     const token = newToken();
     const attempt = runTransaction(db, async tx => {
         const number = await nextReceipt(tx);
-        tx.set(counterRef(), { receipt: number }, { merge: true });
         tx.set(ref, { ...data, receiptNo: number, receiptToken: token });
         return number;
     }).then(number => {
@@ -514,7 +535,6 @@ function assignMissingReceipts() {
                 const entry = await tx.get(ref);
                 if (!entry.exists() || entry.data().receiptNo) return null;
                 const number = await nextReceipt(tx);
-                tx.set(counterRef(), { receipt: number }, { merge: true });
                 tx.set(ref, { receiptNo: number, receiptToken: token }, { merge: true });
                 return number;
             }).then(number => {
@@ -2154,6 +2174,7 @@ function openCollectionSheet({ entry, donorId } = {}) {
             <label>${t("donorName")}
                 <input name="donor" list="donor-names" required autocomplete="off" value="${esc(donor ? donor.name : entry ? entry.donorName : "")}">
             </label>
+            <div id="donor-hint" class="donor-hint">${entry ? "" : donorHint(donor ? donor.name : "")}</div>
             <datalist id="donor-names">${state.donors.map(d => `<option value="${esc(d.name)}">`).join("")}</datalist>
             <label>${t("phoneOptional")}<input name="phone" type="tel" inputmode="tel" value="${esc(donor ? donor.phone : "")}"></label>
             <label>${t("amount")}
@@ -2182,6 +2203,50 @@ function openCollectionSheet({ entry, donorId } = {}) {
                     target="_blank" rel="noopener">${icon("whatsapp")} ${t("sendReceipt")}</a>` : ""}
             ${entry && !entry.deleted ? deleteButton("collections", entry.id) : ""}
         </form>`);
+}
+
+// Under the donor name: known donor, or "new donor, will be added", with close spellings to pick from
+function similarDonors(typed) {
+    const words = nameKey(typed).split(" ").filter(w => w.length >= 2);
+    if (!words.length || nameKey(typed).length < 3) return [];
+    return state.donors
+        .map(d => {
+            const key = nameKey(d.name);
+            const parts = key.split(" ");
+            const hits = words.filter(w => parts.some(p => p.startsWith(w) || w.startsWith(p) && p.length >= 3)).length;
+            return { d, score: key.includes(nameKey(typed)) ? 99 : hits };
+        })
+        .filter(x => x.score >= Math.min(2, words.length))
+        .sort((a, b) => b.score - a.score || a.d.name.localeCompare(b.d.name))
+        .slice(0, 3)
+        .map(x => x.d);
+}
+
+// Fill in a known donor's number; clear a number we filled in earlier once the name no longer matches
+function fillDonorPhone(form, donor) {
+    const phone = form.elements.phone;
+    if (donor) {
+        if (!phone.value || phone.dataset.auto) {
+            phone.value = donor.phone || "";
+            phone.dataset.auto = "1";
+        }
+    } else if (phone.dataset.auto) {
+        phone.value = "";
+        delete phone.dataset.auto;
+    }
+}
+
+function donorHint(typed) {
+    if (!typed.trim()) return "";
+    const donor = state.donors.find(d => nameKey(d.name) === nameKey(typed));
+    if (donor) {
+        const last = lastGift(donor);
+        return `<span class="pos">✓ ${t("existingDonor")}</span>${last ? ` · ${last.year}: ${rs(last.amount)}` : ""}`;
+    }
+    const similar = similarDonors(typed);
+    return `<span class="new-donor">＋ ${t("newDonorWillAdd")}</span>
+        ${similar.length ? `<div class="did-you-mean">${t("didYouMean")}
+            ${similar.map(d => `<button type="button" class="chip" data-act="pick-donor" data-id="${d.id}">${esc(d.name)}</button>`).join("")}</div>` : ""}`;
 }
 
 function openExpenseSheet(entry, preset = {}) {
@@ -2803,8 +2868,9 @@ const FORMS = {
         let donor = state.donors.find(d => nameKey(d.name) === nameKey(f.donor));
         if (!donor) {
             const ref = doc(collection(db, "donors"));
-            donor = { id: ref.id, name: f.donor.trim(), phone: digits(f.phone), history: {} };
+            donor = { id: ref.id, name: f.donor.trim().replace(/\s+/g, " "), phone: digits(f.phone), history: {} };
             batch.set(ref, { name: donor.name, phone: donor.phone, history: {}, ...stamp(true) });
+            toast(t("newDonorAdded", { name: donor.name }));
         } else if (digits(f.phone) && digits(f.phone) !== digits(donor.phone)) {
             donor = { ...donor, phone: digits(f.phone) };
             batch.set(doc(db, "donors", donor.id), { phone: donor.phone }, { merge: true });
@@ -3259,6 +3325,15 @@ const ACTIONS = {
 
     reload: () => location.reload(),
 
+    "pick-donor": (el, id) => {
+        const donor = donorById(id);
+        const form = el.closest("form");
+        if (!donor || !form) return;
+        form.elements.donor.value = donor.name;
+        fillDonorPhone(form, donor);
+        $("#donor-hint").innerHTML = donorHint(donor.name);
+    },
+
     restore: (el, id) => restoreFromLog(state.log.find(e => e.id === id)),
 
     "log-filter": el => {
@@ -3475,6 +3550,11 @@ document.addEventListener("submit", e => {
 
 document.addEventListener("input", e => {
     if (e.target.form && e.target.closest("main.view")) formDirty = true;
+    if (e.target.name === "donor" && $("#donor-hint")) {
+        $("#donor-hint").innerHTML = donorHint(e.target.value);
+        fillDonorPhone(e.target.form, state.donors.find(d => nameKey(d.name) === nameKey(e.target.value)));
+    }
+    if (e.target.name === "phone" && e.target.dataset.auto) delete e.target.dataset.auto;
     const view = e.target.dataset.search;
     if (!view) return;
     state.search[view] = e.target.value;
@@ -3500,8 +3580,7 @@ document.addEventListener("change", e => {
     }
     // Fill in the donor's saved number when a known name is picked
     if (e.target.name === "donor" && form && form.elements.phone) {
-        const donor = state.donors.find(d => nameKey(d.name) === nameKey(e.target.value));
-        if (donor && !form.elements.phone.value) form.elements.phone.value = donor.phone || "";
+        fillDonorPhone(form, state.donors.find(d => nameKey(d.name) === nameKey(e.target.value)));
     }
     // Picking a vendor fills in its category
     if (e.target.name === "vendorId" && form && form.elements.category) {

@@ -1581,3 +1581,27 @@ textarea:focus {
 .made-by .heart {
     color: #e0245e;
 }
+
+/* Collection form: is this donor already in the list? */
+.donor-hint {
+    margin-top: -4px;
+    font-size: 0.88rem;
+    color: var(--muted);
+}
+
+.donor-hint:empty {
+    display: none;
+}
+
+.new-donor {
+    color: var(--saffron);
+    font-weight: 600;
+}
+
+.did-you-mean {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+}
