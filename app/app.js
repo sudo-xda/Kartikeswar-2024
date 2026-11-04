@@ -1158,7 +1158,7 @@ function activeNowPanel() {
 
 // --- Today's summary for the committee WhatsApp group ---
 
-// Shared on WhatsApp: only who gave and what was spent (no balance, cash in hand or last year)
+// Shared on WhatsApp: only the lists of who gave and what was spent (no totals, balance, cash in hand or last year)
 function summaryText() {
     const given = new Map();
     state.collections.forEach(c => given.set(c.donorName, (given.get(c.donorName) || 0) + Number(c.amount)));
@@ -1166,10 +1166,10 @@ function summaryText() {
     const expenses = state.expenses.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
     const lines = [`*${t("sumTitle", { year: year(), date: fmtDate(today()) })}*`, ""];
-    lines.push(`*${t("sumDonations")}: ${rs(sum(state.collections))}* (${t("sumDonors", { n: donors.length })})`);
+    lines.push(`*${t("sumDonations")}*`);
     if (donors.length) donors.forEach(([name, amount]) => lines.push(`• ${name} ${rs(amount)}`));
     else lines.push(t("sumNone"));
-    lines.push("", `*${t("sumExpenses")}: ${rs(sum(expenses))}*`);
+    lines.push("", `*${t("sumExpenses")}*`);
     if (expenses.length) expenses.forEach(e => lines.push(`• ${e.item || e.category} ${rs(e.amount)}`));
     else lines.push(t("sumNone"));
     lines.push("", t("jayMaa"));
