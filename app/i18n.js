@@ -535,6 +535,9 @@ export const STR = {
     // Today's summary (WhatsApp)
     sumTitle: ["Kartikeswar Puja {year} – {date}", "କାର୍ତ୍ତିକେଶ୍ୱର ପୂଜା {year} – {date}"],
     sumToday: ["Collected today", "ଆଜି ଆଦାୟ"],
+    sumDonations: ["Donations", "ଦାନ"],
+    sumExpenses: ["Expenses", "ଖର୍ଚ୍ଚ"],
+    sumNone: ["None yet", "ଏପର୍ଯ୍ୟନ୍ତ କିଛି ନାହିଁ"],
     sumNoneToday: ["No collections today", "ଆଜି କିଛି ଆଦାୟ ହୋଇନାହିଁ"],
     sumTotal: ["Total so far", "ଏପର୍ଯ୍ୟନ୍ତ ମୋଟ"],
     sumSpentBalance: ["Spent {spent} · Balance {balance}", "ଖର୍ଚ୍ଚ {spent} · ବଳକା {balance}"],

@@ -1158,37 +1158,20 @@ function activeNowPanel() {
 
 // --- Today's summary for the committee WhatsApp group ---
 
+// Shared on WhatsApp: only who gave and what was spent (no balance, cash in hand or last year)
 function summaryText() {
-    const now = today();
-    const tt = totals();
-    const todays = state.collections.filter(c => c.date === now);
-    const lastYearTotal = PAST[prevYear()] ? sum(PAST[prevYear()].donations) : 0;
-    const promised = pledgesDue();
+    const given = new Map();
+    state.collections.forEach(c => given.set(c.donorName, (given.get(c.donorName) || 0) + Number(c.amount)));
+    const donors = [...given.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+    const expenses = state.expenses.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
 
-    const lines = [`*${t("sumTitle", { year: year(), date: fmtDate(now) })}*`, ""];
-    if (todays.length) {
-        lines.push(`*${t("sumToday")}: ${rs(sum(todays))}* (${t("sumDonors", { n: todays.length })})`);
-        todays.forEach(c => lines.push(`• ${c.donorName} ${rs(c.amount)}${c.mode === "upi" ? " (UPI)" : ""} – ${memberName(c.collectedBy)}`));
-    } else {
-        lines.push(t("sumNoneToday"));
-    }
-    lines.push("");
-    lines.push(`*${t("sumTotal")}: ${rs(tt.collected)}*` +
-        (lastYearTotal ? ` (${prevYear()}: ${rs(lastYearTotal)}, ${Math.round((tt.collected / lastYearTotal) * 100)}%)` : ""));
-    lines.push(t("sumSpentBalance", { spent: rs(tt.spent), balance: rs(tt.balance) }));
-
-    const holders = [...tt.held.entries()].filter(([, amount]) => amount !== 0).sort((a, b) => b[1] - a[1]);
-    if (holders.length || tt.unassignedOpening) {
-        lines.push("", `*${t("cashInHand")}*`);
-        holders.forEach(([email, amount]) => lines.push(`• ${memberName(email)}: ${rs(amount)}`));
-        if (tt.unassignedOpening) lines.push(`• ${t("notHandedOver", { year: prevYear() })}: ${rs(tt.unassignedOpening)}`);
-    }
-    if (promised.length) {
-        lines.push("", `*${t("sumPromised")}: ${rs(sum(promised, "due"))}*`);
-        promised.slice(0, 10).forEach(p => lines.push(`• ${p.name} ` +
-            (p.given ? t("sumDue", { due: rs(p.due), pledge: rs(p.pledge) }) : rs(p.due))));
-        if (promised.length > 10) lines.push(t("sumAndMore", { n: promised.length - 10 }));
-    }
+    const lines = [`*${t("sumTitle", { year: year(), date: fmtDate(today()) })}*`, ""];
+    lines.push(`*${t("sumDonations")}: ${rs(sum(state.collections))}* (${t("sumDonors", { n: donors.length })})`);
+    if (donors.length) donors.forEach(([name, amount]) => lines.push(`• ${name} ${rs(amount)}`));
+    else lines.push(t("sumNone"));
+    lines.push("", `*${t("sumExpenses")}: ${rs(sum(expenses))}*`);
+    if (expenses.length) expenses.forEach(e => lines.push(`• ${e.item || e.category} ${rs(e.amount)}`));
+    else lines.push(t("sumNone"));
     lines.push("", t("jayMaa"));
     return lines.join("\n");
 }
